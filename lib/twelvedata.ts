@@ -64,8 +64,6 @@ function normalizeSymbol(symbol: string): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GoldAPI integration: Build candles from daily historical spot prices
-// ─────────────────────────────────────────────────────────────────────────────
 // Twelve Data integration: Accurate gold spot prices + candles
 // ─────────────────────────────────────────────────────────────────────────────
 async function fetchTwelveData(endpoint: string, params: Record<string, string>) {
@@ -216,11 +214,11 @@ async function fetchJsonWithRetry(url: string): Promise<any> {
   throw lastError instanceof Error ? lastError : new Error('Unknown provider fetch error')
 }
 
-// Removed: fetchAlpha(), fetchMarketstack(), fetchFinnhub() - using Twelve Data + GoldAPI only
+// Removed: fetchAlpha(), fetchMarketstack(), fetchFinnhub() - using Twelve Data only
 
 // Removed: parseAlphaSeries(), resampleTo4h(), parseMarketstackRows(), parseFinnhubCandles() - using Twelve Data native interval support
 
-// Removed: fetchAlphaCandles(), fetchMarketstackCandles(), fetchFinnhubCandles() - using Twelve Data + GoldAPI only
+// Removed: fetchAlphaCandles(), fetchMarketstackCandles(), fetchFinnhubCandles() - using Twelve Data only
 
 function quoteFromCandles(symbol: string, candles: Candle[]): Quote {
   const last = candles[candles.length - 1]
