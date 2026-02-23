@@ -14,8 +14,12 @@
     "forceConsistentCasingInFileNames": true,
     "jsx": "preserve",
     "incremental": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    }
   },
-  "include": ["next-env.d.ts", "index.tsx", "pages/**/*.ts", "pages/**/*.tsx"],
+  "include": ["next-env.d.ts", "index.tsx", "pages/**/*.ts", "pages/**/*.tsx", "lib/**/*.ts"],
   "exclude": ["node_modules"]
 }
