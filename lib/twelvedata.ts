@@ -1,9 +1,7 @@
-// lib/twelvedata.ts — Twelve Data API integration
-const API_KEY = () => process.env.TWELVE_DATA_API_KEY!
+// lib/twelvedata.ts — Market data integration with provider fallback
 const ALPHA_KEY = () => process.env.ALPHAVANTAGE_API_KEY
 const MARKETSTACK_KEY = () => process.env.MARKETSTACK_API_KEY
 const FINNHUB_KEY = () => process.env.FINNHUB_API_KEY
-const BASE = 'https://api.twelvedata.com'
 const ALPHA_BASE = 'https://www.alphavantage.co/query'
 const MARKETSTACK_BASE = 'https://api.marketstack.com/v1'
 const FINNHUB_BASE = 'https://finnhub.io/api/v1'
@@ -29,7 +27,7 @@ export interface Candle {
   volume: number
 }
 
-export type DataProvider = 'twelve_data' | 'alpha_vantage' | 'marketstack' | 'finnhub' | 'synthetic'
+export type DataProvider = 'alpha_vantage' | 'marketstack' | 'finnhub' | 'synthetic'
 
 const candleCache = new Map<string, Candle[]>()
 
@@ -443,59 +441,7 @@ function calculateATR(candles: Candle[], period = 14): number {
   return tail.reduce((sum, v) => sum + v, 0) / period
 }
 
-async function fetchTwelve(endpoint: string, params: Record<string, any>) {
-  const key = API_KEY()
-  if (!key) {
-    throw new Error('Missing TWELVE_DATA_API_KEY')
-  }
-
-  const url = new URL(`${BASE}/${endpoint}`)
-  url.searchParams.append('apikey', key)
-  Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, String(v)))
-
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 20_000)
-  let res: Response
-  try {
-    res = await fetch(url.toString(), { cache: 'no-store', signal: controller.signal })
-  } finally {
-    clearTimeout(timeout)
-  }
-
-  if (!res.ok) throw new Error(`Twelve Data API error: ${res.status}`)
-  const data = await res.json()
-  if (data?.status === 'error') {
-    throw new Error(`Twelve Data API error: ${data?.message ?? 'Unknown error'}`)
-  }
-  return data
-}
-
 export async function fetchQuoteWithProvider(symbol: string): Promise<{ quote: Quote; provider: DataProvider }> {
-  if (process.env.TWELVE_DATA_API_KEY) {
-    try {
-      const data = await fetchTwelve('quote', { symbol })
-      return {
-        quote: {
-          symbol: data.symbol ?? symbol,
-          close: parseFloat(data.close ?? 2650),
-          change: parseFloat(data.change ?? 0),
-          percent_change: parseFloat(data.percent_change ?? 0),
-          high: parseFloat(data.high ?? 2660),
-          low: parseFloat(data.low ?? 2640),
-          open: parseFloat(data.open ?? 2650),
-          volume: parseInt(data.volume ?? 0),
-          fifty_two_week: {
-            low: parseFloat(data.fifty_two_week?.low ?? 2000),
-            high: parseFloat(data.fifty_two_week?.high ?? 2700)
-          }
-        },
-        provider: 'twelve_data'
-      }
-    } catch (error) {
-      console.warn('[data provider] Twelve Data quote failed, trying fallback:', error)
-    }
-  }
-
   if (ALPHA_KEY()) {
     try {
       const candles = await fetchAlphaCandles(symbol, '1day', 260)
@@ -532,27 +478,6 @@ export async function fetchQuote(symbol: string): Promise<Quote> {
 }
 
 export async function fetchCandlesWithProvider(symbol: string, interval: string, count: number): Promise<{ candles: Candle[]; provider: DataProvider }> {
-  if (process.env.TWELVE_DATA_API_KEY) {
-    try {
-      const data = await fetchTwelve('time_series', { symbol, interval, outputsize: count })
-      if (data.values && Array.isArray(data.values)) {
-        return {
-          candles: data.values.map((v: any) => ({
-            time: new Date(v.datetime).getTime() / 1000,
-            open: parseFloat(v.open),
-            high: parseFloat(v.high),
-            low: parseFloat(v.low),
-            close: parseFloat(v.close),
-            volume: parseFloat(v.volume ?? 0)
-          })).reverse(),
-          provider: 'twelve_data'
-        }
-      }
-    } catch (error) {
-      console.warn('[data provider] Twelve Data candles failed, trying fallback:', error)
-    }
-  }
-
   if (ALPHA_KEY()) {
     try {
       const candles = await fetchAlphaCandles(symbol, interval, count)
@@ -589,15 +514,6 @@ export async function fetchCandles(symbol: string, interval: string, count: numb
 }
 
 export async function fetchRSI(symbol: string, interval: string): Promise<number> {
-  if (process.env.TWELVE_DATA_API_KEY) {
-    try {
-      const data = await fetchTwelve('rsi', { symbol, interval })
-      return parseFloat(data.values?.[0]?.rsi ?? 50)
-    } catch {
-      // fall through
-    }
-  }
-
   try {
     const candles = await fetchCandles(symbol, interval, 160)
     return calculateRSI(candles)
@@ -607,20 +523,6 @@ export async function fetchRSI(symbol: string, interval: string): Promise<number
 }
 
 export async function fetchMACD(symbol: string, interval: string): Promise<{ macd: number; signal: number; histogram: number }> {
-  if (process.env.TWELVE_DATA_API_KEY) {
-    try {
-      const data = await fetchTwelve('macd', { symbol, interval })
-      const val = data.values?.[0]
-      return {
-        macd: parseFloat(val?.macd ?? 0),
-        signal: parseFloat(val?.macd_signal ?? 0),
-        histogram: parseFloat(val?.macd_hist ?? 0)
-      }
-    } catch {
-      // fall through
-    }
-  }
-
   try {
     const candles = await fetchCandles(symbol, interval, 200)
     return calculateMACD(candles)
@@ -630,20 +532,6 @@ export async function fetchMACD(symbol: string, interval: string): Promise<{ mac
 }
 
 export async function fetchBBands(symbol: string, interval: string): Promise<{ upper: number; middle: number; lower: number }> {
-  if (process.env.TWELVE_DATA_API_KEY) {
-    try {
-      const data = await fetchTwelve('bbands', { symbol, interval })
-      const val = data.values?.[0]
-      return {
-        upper: parseFloat(val?.upper_band ?? 2680),
-        middle: parseFloat(val?.middle_band ?? 2650),
-        lower: parseFloat(val?.lower_band ?? 2620)
-      }
-    } catch {
-      // fall through
-    }
-  }
-
   try {
     const candles = await fetchCandles(symbol, interval, 200)
     return calculateBBands(candles)
@@ -653,15 +541,6 @@ export async function fetchBBands(symbol: string, interval: string): Promise<{ u
 }
 
 export async function fetchATR(symbol: string, interval: string): Promise<number> {
-  if (process.env.TWELVE_DATA_API_KEY) {
-    try {
-      const data = await fetchTwelve('atr', { symbol, interval })
-      return parseFloat(data.values?.[0]?.atr ?? 15)
-    } catch {
-      // fall through
-    }
-  }
-
   try {
     const candles = await fetchCandles(symbol, interval, 200)
     return calculateATR(candles)

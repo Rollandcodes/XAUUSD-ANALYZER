@@ -71,10 +71,10 @@ export default function About() {
             </div>
             <div style={s.card}>
               <div style={s.cardIcon}>◈</div>
-              <h3 style={s.cardTitle}>Twelve Data</h3>
+              <h3 style={s.cardTitle}>Multi-Provider Market Data</h3>
               <p style={s.cardText}>
-                Real-time and historical OHLCV data with 150+ technical indicators for precise
-                market analysis.
+                Resilient market data from Alpha Vantage, Marketstack, and Finnhub with
+                automatic fallback for reliability and uptime.
               </p>
             </div>
             <div style={s.card}>

@@ -154,7 +154,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const spotInsights = goldSpot ? computeSpotInsights(goldSpot, goldHistory) : null
 
     // Use GoldAPI price as price reference if available (it's more accurate for spot)
-    // Fall back to Twelve Data quote
+    // Fall back to provider-chain quote (Alpha Vantage / Marketstack / Finnhub / synthetic)
     const spotPrice = goldSpot?.price ?? quote.close
 
     // Run ICT analysis engine

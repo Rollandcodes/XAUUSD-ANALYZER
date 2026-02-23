@@ -43,8 +43,8 @@ The bias indicator shows the current market direction.`
       icon: '◈',
       content: `For full functionality, configure these API keys:
 
-1. **Twelve Data** (required): Market data and indicators
-   - Get your free API key at twelvedata.com
+  1. **Alpha Vantage, Marketstack, Finnhub** (required): Market data fallback chain
+    - Get API keys at alphavantage.co, marketstack.com, and finnhub.io
 
 2. **Anthropic Claude** (required): AI analysis
    - Get your API key at anthropic.com

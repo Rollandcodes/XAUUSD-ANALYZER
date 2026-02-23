@@ -58,7 +58,7 @@ PipNexus is an intelligent XAU/USD gold trading terminal powered by **OpenAI/Ant
 
 - **Frontend**: Next.js 15, React 18, TypeScript
 - **AI**: OpenAI GPT-4 or Anthropic Claude Sonnet 4
-- **Market Data**: Twelve Data API
+- **Market Data**: Alpha Vantage + Marketstack + Finnhub (fallback chain)
 - **Spot Prices**: GoldAPI.io
 - **Economic Data**: Trading Economics / JBlanked
 - **Charting**: Lightweight Charts
@@ -94,7 +94,9 @@ cp .env.example .env.local
 1. Edit `.env.local` with your API keys:
 
 ```env
-TWELVE_DATA_API_KEY=your_twelve_data_key
+ALPHAVANTAGE_API_KEY=your_alphavantage_key
+MARKETSTACK_API_KEY=your_marketstack_key
+FINNHUB_API_KEY=your_finnhub_key
 OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
 GOLDAPI_KEY=your_goldapi_key
@@ -113,7 +115,9 @@ npm run dev
 
 |Service|Required|Description|Sign Up|
 |---|---|---|---|
-|Twelve Data|Yes|Market data & indicators|[twelvedata.com](https://twelvedata.com)|
+|Alpha Vantage|Yes|Market data fallback|[alphavantage.co](https://www.alphavantage.co)|
+|Marketstack|Yes|Market data fallback|[marketstack.com](https://marketstack.com)|
+|Finnhub|Yes|Market data fallback|[finnhub.io](https://finnhub.io)|
 |OpenAI|Yes|AI analysis|[openai.com](https://openai.com)|
 |Anthropic|Optional|Alternative AI engine|[anthropic.com](https://anthropic.com)|
 |GoldAPI.io|No|Spot prices|[goldapi.io](https://goldapi.io)|
@@ -190,7 +194,9 @@ Last bearish candle before a bullish impulse (Bullish OB) or last bullish candle
 1. Push your code to GitHub
 1. Import project in Vercel
 1. Configure environment variables:
-   - `TWELVE_DATA_API_KEY`
+   - `ALPHAVANTAGE_API_KEY`
+   - `MARKETSTACK_API_KEY`
+   - `FINNHUB_API_KEY`
    - `OPENAI_API_KEY`
    - `ANTHROPIC_API_KEY` (optional)
    - `GOLDAPI_KEY`
