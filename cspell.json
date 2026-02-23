@@ -32,6 +32,18 @@
     "advisoryengine",
     "riskmanagement",
     "recoveryfactor",
-    "GDXJ"
+    "GDXJ",
+    "waitlist",
+    "referral",
+    "sendgrid",
+    "mailgun",
+    "resend",
+    "klaviyo",
+    "mailchimp",
+    "onboarding",
+    "leaderboard",
+    "gamification",
+    "PostgreSQL",
+    "GDPR"
   ]
 }
