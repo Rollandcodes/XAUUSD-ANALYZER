@@ -140,8 +140,8 @@ export default function GoldTerminal() {
   return (
     <>
       <Head>
-        <title>XAU/USD · Gold Terminal</title>
-        <meta name="description" content="XAUUSD AI trading terminal — AMD, Order Blocks, FVG, S&R" />
+        <title>XAU/USD · PipNexus Terminal</title>
+        <meta name="description" content="PipNexus XAUUSD AI trading terminal — AMD, Order Blocks, FVG, S&R" />
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬡</text></svg>" />
         <style>{`
           :root {
@@ -202,8 +202,8 @@ export default function GoldTerminal() {
             <div style={s.logo}>
               <span style={s.logoMark}>⬡</span>
               <div>
-                <div style={s.logoTitle}>XAU / USD</div>
-                <div style={s.logoSub}>GOLD · ICT TERMINAL</div>
+                <div style={s.logoTitle}>PIPNEXUS</div>
+                <div style={s.logoSub}>XAU/USD · ICT INTELLIGENCE</div>
               </div>
               {q && (
                 <div style={s.livePrice}>
@@ -245,7 +245,7 @@ export default function GoldTerminal() {
         {!data && !loading && !error && (
           <div style={s.empty} className="fu">
             <div style={s.emptyGlyph}>⬡</div>
-            <div style={s.emptyTitle}>Gold Intelligence Terminal</div>
+            <div style={s.emptyTitle}>PipNexus Intelligence</div>
             <div style={s.emptyDesc}>AMD Strategy · Order Blocks · Fair Value Gaps · Support & Resistance</div>
             <button style={s.emptyBtn} onClick={() => analyze()}>
               ⟳ INITIALIZE ANALYSIS
@@ -615,9 +615,15 @@ export default function GoldTerminal() {
 
             {/* ── FOOTER ── */}
             <footer style={s.footer}>
-              <span>GOLD TERMINAL © {new Date().getFullYear()}</span>
-              <span style={{color:'var(--text3)'}}>Educational purposes only · Not financial advice · News via Forex Factory / JBlanked</span>
-              {lastUp && <span>Last update: {lastUp.toLocaleTimeString()}</span>}
+              <div style={s.footerLeft}>
+                <span style={s.footerBrand}>PIPNEXUS © {new Date().getFullYear()}</span>
+                <span style={s.footerRole}>Founder & CTO: <strong>Rolland Muhanguzi</strong></span>
+                <span style={s.footerRole}>CEO: <strong>Shema Troy Tukahirwa</strong></span>
+              </div>
+              <div style={s.footerCenter}>
+                <span style={{color:'var(--text3)'}}>Educational purposes only · Not financial advice</span>
+              </div>
+              {lastUp && <span style={s.footerRight}>Last update: {lastUp.toLocaleTimeString()}</span>}
             </footer>
           </main>
         )}
@@ -829,7 +835,12 @@ const s: Record<string, React.CSSProperties> = {
   badge:  { fontSize:8, padding:'2px 7px', border:'1px solid', borderRadius:2, letterSpacing:'0.1em' },
   empty2: { fontSize:11, color:'var(--text3)', padding:'12px 0' },
   gptTag: { fontSize:9, padding:'3px 8px', background:'var(--gold-dim)', border:'1px solid var(--border2)', color:'var(--gold)', borderRadius:2, letterSpacing:'0.06em' },
-  footer: { borderTop:'1px solid var(--border)', padding:'12px 24px', display:'flex', justifyContent:'space-between', fontSize:9, color:'var(--text3)', letterSpacing:'0.06em', marginTop:8 },
+  footer: { borderTop:'1px solid var(--border)', padding:'16px 28px', display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:9, color:'var(--text3)', letterSpacing:'0.06em', marginTop:8, flexWrap:'wrap', gap:12, background:'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%)', backdropFilter:'blur(8px)' },
+  footerLeft: { display:'flex', gap:16, alignItems:'center', flexWrap:'wrap' },
+  footerBrand: { fontFamily:'var(--serif)', fontSize:11, letterSpacing:'0.15em', color:'var(--gold)', fontWeight:700 },
+  footerRole: { fontSize:9, color:'var(--text3)' },
+  footerCenter: { flex:1, textAlign:'center', minWidth:200 },
+  footerRight: { fontSize:9, color:'var(--text2)' },
   // GoldAPI Spot Strip
   spotStrip:    { display:'flex', alignItems:'center', gap:0, background:'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%)', backdropFilter:'blur(12px)', border:'1px solid rgba(201,168,76,0.2)', borderRadius:8, padding:'14px 20px', marginBottom:16, flexWrap:'wrap' as any, boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)' },
   spotDivider:  { width:1, height:44, background:'var(--border)', margin:'0 16px', flexShrink:0 },
