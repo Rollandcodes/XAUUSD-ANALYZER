@@ -40,10 +40,32 @@ export interface Candle {
 
 export type DataProvider = 'alpha_vantage' | 'marketstack' | 'finnhub' | 'synthetic'
 
-const candleCache = new Map<string, Candle[]>()
+interface CandleCacheEntry {
+  candles: Candle[]
+  fetchedAt: number
+}
+
+const candleCache = new Map<string, CandleCacheEntry>()
+
+function normalizeSymbol(symbol: string): string {
+  const cleaned = (symbol ?? '').trim().toUpperCase().replace(/[-_\s]/g, '')
+  if (cleaned === 'GOLD' || cleaned === 'XAUUSD' || cleaned === 'XAUUS$') {
+    return 'XAU/USD'
+  }
+  if (cleaned === 'XAU/USD'.replace('/', '')) {
+    return 'XAU/USD'
+  }
+  return symbol?.includes('/') ? symbol.toUpperCase() : symbol
+}
+
+function getCacheTtlMs(interval: string): number {
+  if (interval === '1day') return 5 * 60_000
+  return 45_000
+}
 
 function parseSymbol(symbol: string): { from: string; to: string } {
-  const [from = 'XAU', to = 'USD'] = symbol.split('/')
+  const canonical = normalizeSymbol(symbol)
+  const [from = 'XAU', to = 'USD'] = canonical.split('/')
   return { from, to }
 }
 
@@ -68,8 +90,44 @@ function mapIntervalToFinnhub(interval: string): { resolution: '15' | '60' | 'D'
 }
 
 function toFinnhubSymbol(symbol: string): string {
-  const [from = 'XAU', to = 'USD'] = symbol.split('/')
+  const canonical = normalizeSymbol(symbol)
+  const [from = 'XAU', to = 'USD'] = canonical.split('/')
   return `OANDA:${from}_${to}`
+}
+
+async function fetchFinnhubQuote(symbol: string): Promise<Quote> {
+  const data = await fetchFinnhub('quote', {
+    symbol: toFinnhubSymbol(symbol)
+  })
+
+  const close = Number(data?.c)
+  const high = Number(data?.h)
+  const low = Number(data?.l)
+  const open = Number(data?.o)
+  const prevClose = Number(data?.pc)
+  const change = Number.isFinite(Number(data?.d)) ? Number(data?.d) : close - prevClose
+  const percentChange = Number.isFinite(Number(data?.dp)) && Number(data?.dp) !== 0
+    ? Number(data?.dp)
+    : (prevClose ? (change / prevClose) * 100 : 0)
+
+  if (!Number.isFinite(close) || close <= 0) {
+    throw new Error('Finnhub quote error: invalid quote payload')
+  }
+
+  return {
+    symbol: normalizeSymbol(symbol) || 'XAU/USD',
+    close,
+    change: Number.isFinite(change) ? change : 0,
+    percent_change: Number.isFinite(percentChange) ? percentChange : 0,
+    high: Number.isFinite(high) ? high : close,
+    low: Number.isFinite(low) ? low : close,
+    open: Number.isFinite(open) ? open : close,
+    volume: 0,
+    fifty_two_week: {
+      low: Number.isFinite(low) ? Math.min(low, close) : close,
+      high: Number.isFinite(high) ? Math.max(high, close) : close
+    }
+  }
 }
 
 function sleep(ms: number): Promise<void> {
@@ -263,11 +321,12 @@ function parseFinnhubCandles(data: any): Candle[] {
 }
 
 async function fetchAlphaCandles(symbol: string, interval: string, count: number): Promise<Candle[]> {
-  const cacheKey = `${symbol}:${interval}:${count}`
+  const canonical = normalizeSymbol(symbol)
+  const cacheKey = `${canonical}:${interval}:${count}`
   const cached = candleCache.get(cacheKey)
-  if (cached) return cached
+  if (cached && Date.now() - cached.fetchedAt <= getCacheTtlMs(interval)) return cached.candles
 
-  const { from, to } = parseSymbol(symbol)
+  const { from, to } = parseSymbol(canonical)
   const mapped = mapIntervalToAlpha(interval)
   let params: Record<string, string>
   if (mapped === '1day') {
@@ -295,7 +354,7 @@ async function fetchAlphaCandles(symbol: string, interval: string, count: number
   }
 
   const finalCandles = candles.slice(-count)
-  candleCache.set(cacheKey, finalCandles)
+  candleCache.set(cacheKey, { candles: finalCandles, fetchedAt: Date.now() })
   return finalCandles
 }
 
@@ -459,10 +518,21 @@ function calculateATR(candles: Candle[], period = 14): number {
 }
 
 export async function fetchQuoteWithProvider(symbol: string): Promise<{ quote: Quote; provider: DataProvider }> {
+  const canonical = normalizeSymbol(symbol)
+
+  if (FINNHUB_KEY()) {
+    try {
+      const quote = await fetchFinnhubQuote(canonical)
+      return { quote, provider: 'finnhub' }
+    } catch (error) {
+      console.warn('[data provider] Finnhub realtime quote failed, trying fallback:', error)
+    }
+  }
+
   if (ALPHA_KEY()) {
     try {
-      const candles = await fetchAlphaCandles(symbol, '1day', 260)
-      if (candles.length) return { quote: quoteFromCandles(symbol, candles), provider: 'alpha_vantage' }
+      const candles = await fetchAlphaCandles(canonical, '15min', 260)
+      if (candles.length) return { quote: quoteFromCandles(canonical, candles), provider: 'alpha_vantage' }
     } catch (error) {
       console.warn('[data provider] Alpha Vantage quote failed, trying fallback:', error)
     }
@@ -470,23 +540,14 @@ export async function fetchQuoteWithProvider(symbol: string): Promise<{ quote: Q
 
   if (MARKETSTACK_KEY()) {
     try {
-      const candles = await fetchMarketstackCandles(symbol, '1day', 260)
-      if (candles.length) return { quote: quoteFromCandles(symbol, candles), provider: 'marketstack' }
+      const candles = await fetchMarketstackCandles(canonical, '1h', 260)
+      if (candles.length) return { quote: quoteFromCandles(canonical, candles), provider: 'marketstack' }
     } catch (error) {
       console.warn('[data provider] Marketstack quote failed, trying fallback:', error)
     }
   }
 
-  if (FINNHUB_KEY()) {
-    try {
-      const candles = await fetchFinnhubCandles(symbol, '1day', 260)
-      if (candles.length) return { quote: quoteFromCandles(symbol, candles), provider: 'finnhub' }
-    } catch (error) {
-      console.warn('[data provider] Finnhub quote failed, using synthetic fallback:', error)
-    }
-  }
-
-  return { quote: quoteFromCandles(symbol, generateMockCandles(260, 2650)), provider: 'synthetic' }
+  return { quote: quoteFromCandles(canonical, generateMockCandles(260, 2650)), provider: 'synthetic' }
 }
 
 export async function fetchQuote(symbol: string): Promise<Quote> {
@@ -495,9 +556,20 @@ export async function fetchQuote(symbol: string): Promise<Quote> {
 }
 
 export async function fetchCandlesWithProvider(symbol: string, interval: string, count: number): Promise<{ candles: Candle[]; provider: DataProvider }> {
+  const canonical = normalizeSymbol(symbol)
+
+  if (FINNHUB_KEY()) {
+    try {
+      const candles = await fetchFinnhubCandles(canonical, interval, count)
+      if (candles.length) return { candles, provider: 'finnhub' }
+    } catch (error) {
+      console.warn('[data provider] Finnhub candles failed, trying fallback:', error)
+    }
+  }
+
   if (ALPHA_KEY()) {
     try {
-      const candles = await fetchAlphaCandles(symbol, interval, count)
+      const candles = await fetchAlphaCandles(canonical, interval, count)
       if (candles.length) return { candles, provider: 'alpha_vantage' }
     } catch (error) {
       console.warn('[data provider] Alpha Vantage candles failed, trying fallback:', error)
@@ -506,19 +578,10 @@ export async function fetchCandlesWithProvider(symbol: string, interval: string,
 
   if (MARKETSTACK_KEY()) {
     try {
-      const candles = await fetchMarketstackCandles(symbol, interval, count)
+      const candles = await fetchMarketstackCandles(canonical, interval, count)
       if (candles.length) return { candles, provider: 'marketstack' }
     } catch (error) {
       console.warn('[data provider] Marketstack candles failed, trying fallback:', error)
-    }
-  }
-
-  if (FINNHUB_KEY()) {
-    try {
-      const candles = await fetchFinnhubCandles(symbol, interval, count)
-      if (candles.length) return { candles, provider: 'finnhub' }
-    } catch (error) {
-      console.warn('[data provider] Finnhub candles failed, using synthetic fallback:', error)
     }
   }
 

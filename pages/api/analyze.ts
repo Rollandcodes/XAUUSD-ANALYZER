@@ -30,8 +30,16 @@ import {
 import { fetchGoldSpot, fetchGoldWeekHistory, computeSpotInsights } from '@/lib/goldapi'
 import { generatePriceActionSignal, type PriceActionSignal } from '@/lib/priceaction'
 
-const SYMBOL = 'XAU/USD'
+const DEFAULT_SYMBOL = 'XAU/USD'
 const ALLOWED_INTERVALS = new Set(['15min', '1h', '4h', '1day'])
+
+function normalizeSymbolInput(input: unknown): string {
+  if (typeof input !== 'string' || !input.trim()) return DEFAULT_SYMBOL
+  const cleaned = input.trim().toUpperCase().replace(/[-_\s]/g, '')
+  if (cleaned === 'GOLD' || cleaned === 'XAUUSD' || cleaned === 'XAUUS$') return 'XAU/USD'
+  if (cleaned === 'XAU/USD'.replace('/', '')) return 'XAU/USD'
+  return input.trim().toUpperCase()
+}
 
 // Prefer OpenAI if key present, fallback to Anthropic
 const useOpenAI = !!process.env.OPENAI_API_KEY
@@ -128,18 +136,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (typeof interval !== 'string' || !ALLOWED_INTERVALS.has(interval)) {
     return res.status(400).json({ error: 'Invalid interval' })
   }
+  const symbol = normalizeSymbolInput(req.body?.symbol)
 
   try {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
 
     // Fetch everything in parallel — 4 data sources simultaneously
     const [quoteResult, candlesResult, rsi, macd, bbands, atr, todayNews, weekNews, goldSpot] = await Promise.all([
-      fetchQuoteWithProvider(SYMBOL),
-      fetchCandlesWithProvider(SYMBOL, interval, 150),
-      fetchRSI(SYMBOL, interval),
-      fetchMACD(SYMBOL, interval),
-      fetchBBands(SYMBOL, interval),
-      fetchATR(SYMBOL, interval),
+      fetchQuoteWithProvider(symbol),
+      fetchCandlesWithProvider(symbol, interval, 150),
+      fetchRSI(symbol, interval),
+      fetchMACD(symbol, interval),
+      fetchBBands(symbol, interval),
+      fetchATR(symbol, interval),
       fetchTodayNews(),
       fetchWeekNews(),
       fetchGoldSpot(),            // GoldAPI.io — spot bid/ask/spread

@@ -68,7 +68,7 @@ export default function GoldTerminal() {
       const res  = await fetch('/api/analyze', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ interval: selectedInterval }),
+        body:JSON.stringify({ interval: selectedInterval, symbol: 'XAUUSD' }),
         signal: controller.signal,
       })
       if (timeout) clearTimeout(timeout)
