@@ -491,7 +491,7 @@ function detectCHoCH(candles: Candle[]): boolean {
   return false
 }
 
-function detectCHoCHDirection(candles: Candle[]): 'BULLISH' | 'BEARISH' {
+function detectCHoCHDirection(candles: Candle[]): 'BULLISH' | 'BEARISH' | 'NEUTRAL' {
   const mid = Math.floor(candles.length / 2)
   const highs = candles.map(c => c.high)
   const lows = candles.map(c => c.low)
