@@ -46,7 +46,7 @@ export default function GoldTerminal() {
   const [data,     setData]      = useState<AnalysisData|null>(null)
   const [loading,  setLoading]   = useState(false)
   const [error,    setError]     = useState('')
-  const [autoRef,  setAutoRef]   = useState(false)
+  const [autoRef,  setAutoRef]   = useState(true)  // Auto-refresh ON by default
   const [highContrast, setHighContrast] = useState(false)
   const [lastUp,   setLastUp]    = useState<Date|null>(null)
   const chartRef    = useRef<HTMLDivElement>(null)
@@ -167,7 +167,8 @@ export default function GoldTerminal() {
 
     const tick = (ts: number) => {
       if (!lastAutoRun.current) lastAutoRun.current = ts
-      if (ts - lastAutoRun.current >= 60_000) {
+      // Auto-refresh every 20 seconds for real-time updates
+      if (ts - lastAutoRun.current >= 20_000) {
         lastAutoRun.current = ts
         void analyze()
       }

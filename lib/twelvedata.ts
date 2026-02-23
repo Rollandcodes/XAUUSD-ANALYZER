@@ -158,8 +158,9 @@ async function fetchTwelveDataCandles(symbol: string, interval: string, count: n
 }
 
 function getCacheTtlMs(interval: string): number {
-  if (interval === '1day') return 5 * 60_000
-  return 45_000
+  // Reduced cache time for faster real-time updates
+  if (interval === '1day') return 2 * 60_000  // 2 minutes for daily
+  return 15_000  // 15 seconds for intraday (15min, 1h, 4h)
 }
 
 function parseSymbol(symbol: string): { from: string; to: string } {
