@@ -1,129 +1,185 @@
-# ⬡ XAU/USD Gold Intelligence Terminal
+# ⬡ PipNexus - AI-Powered XAU/USD Gold Trading Terminal
 
-Real-time XAUUSD trading terminal using ICT methodology — AMD Strategy, Order Blocks, Fair Value Gaps, and Support & Resistance — powered by Twelve Data and GPT-4o mini.
+<div align="center">
 
----
+![PipNexus](https://img.shields.io/badge/PipNexus-XAU%2FUSD-FFD700?style=for-the-badge)
+![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square)
+![Claude AI](https://img.shields.io/badge/Claude-Sonnet%204-orange?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-## 🟡 GoldAPI.io — Live Spot Price
+</div>
 
-Real-time gold spot bid/ask/spread from [goldapi.io](https://www.goldapi.io).
+## Overview
 
-### Get your free API key
-1. Go to [goldapi.io](https://www.goldapi.io) → Sign up free (no card required)
-2. Copy your API key from the dashboard
-3. Add as `GOLDAPI_KEY` in Vercel environment variables
+PipNexus is an intelligent XAU/USD gold trading terminal powered by **Anthropic Claude AI** and built on the **ICT (Inner Circle Trader)** methodology. It provides real-time market analysis, trade signals, and comprehensive fundamental analysis for gold traders.
 
-> **Free tier:** 100 requests/month · daily historical · 2-second update interval
+## What's New
 
-### What GoldAPI.io adds
+- **Claude AI Integration**: Replaced OpenAI with Anthropic Claude for deeper market analysis
+- **Enhanced Technical Analysis**: Multi-timeframe analysis, advanced pattern recognition
+- **Improved Fundamental Analysis**: Real news API integration, sentiment analysis
+- **New Pages**: About, History, Reviews, Waitlist, How to Use, Blog
+- **Modernized UI**: Updated design with smooth animations
 
-| Feature | Description |
-|---|---|
-| **Live Bid / Ask** | Real spot bid and ask prices — more precise than Twelve Data for entries |
-| **Spread monitor** | Spread in $ and % — TIGHT/NORMAL/WIDE indicator for liquidity quality |
-| **Weekly range bar** | Visual 7-day high/low with price position % — tells you if you're buying premium or discount |
-| **Weekly trend** | UPTREND / DOWNTREND / SIDEWAYS based on 5-day price action |
-| **Gram prices** | 24K / 22K / 21K / 18K per gram in USD — useful retail context |
-| **Signal influence** | Wide spread → −10% confidence; buying near weekly low → +5%; selling near weekly high → +5% |
-| **GPT context** | Bid/ask and weekly position fed into the AI narrative for more precise analysis |
+## Features
 
-### Entry precision with bid/ask
-- **BUY signal** → enter at the **ask** price (what you pay)
-- **SELL signal** → enter at the **bid** price (what you receive)
-- Wide spread (> 0.05%) warns of low liquidity — common during Asian session or before major news
+### Core Analysis
+- **AMD Phase Detection**: Accumulation, Distribution, Manipulation, Decline phases
+- **Order Blocks**: Identification of institutional order flow zones
+- **Fair Value Gaps (FVGs)**: Detection of market imbalances
+- **Support & Resistance**: Smart Money Concepts-based levels
 
----
+### Enhanced AI Analysis (New)
+- **Anthropic Claude Integration**: Deep market narrative generation with extended reasoning
+- **Multi-Timeframe Analysis**: Confluence scoring across M15, H1, H4, D1
+- **Pattern Recognition**: CHoCH (Change of Character), BOS (Break of Structure), liquidity sweeps
+- **Liquidity Zone Detection**: Buy/Sell stops identification and stop hunt detection
 
+### Technical Indicators
+- RSI (14)
+- MACD
+- Bollinger Bands
+- ATR
 
+### Fundamental Analysis (Enhanced)
+- Real-time economic calendar (Trading Economics)
+- News risk assessment with timing
+- USD bias computation
+- Event impact scoring
+- Macro correlation tracking (DXY, yields, S&P 500, Silver)
 
-News data is powered by the **JBlanked News API** (jblanked.com) which aggregates Forex Factory economic calendar data.
+## Technology Stack
 
-### Get your free API key
-1. Go to [jblanked.com](https://www.jblanked.com) → Sign up free
-2. Go to **Profile → API Key** → generate your key
-3. Add as `JBLANKED_API_KEY` in Vercel environment variables
+- **Frontend**: Next.js 15, React 18, TypeScript
+- **AI**: Anthropic Claude Sonnet 4
+- **Market Data**: Twelve Data API
+- **Spot Prices**: GoldAPI.io
+- **Economic Data**: Trading Economics / JBlanked
+- **Charting**: Lightweight Charts
 
-> **Note:** The free plan allows 1 request/day. The terminal fetches news once per analysis. If you don't add a key, news fetching gracefully degrades — the terminal still works with technical analysis only.
+## Getting Started
 
-### What the news integration does
+### Prerequisites
 
-| Feature | Description |
-|---|---|
-| **News Risk Badge** | RED/ORANGE/YELLOW/GREEN — tells you if it's safe to trade RIGHT NOW |
-| **DO NOT TRADE alert** | Blocks new signals when high-impact news is within 30 minutes |
-| **Fundamental Bias** | Analyzes released USD data (Strong/Weak) → USD↑ = Gold↓ and vice versa |
-| **Confidence adjustment** | +10% if fundamentals align with technicals, −15% if they conflict |
-| **Today's high-impact events** | All USD High-impact releases with Actual/Forecast/Previous |
-| **This week upcoming** | All remaining high-impact USD events for the week |
+- Node.js 18+
+- npm or yarn
 
-### News events that move Gold most
-NFP, CPI, FOMC/Fed Rate Decision, PCE, GDP, PPI, Unemployment Rate, Retail Sales, ISM, ADP, Powell/Yellen speeches
+### Installation
 
----
-
-
-
-### AMD (Accumulation / Manipulation / Distribution)
-- **Accumulation (Asia session)**: Smart money builds positions within a tight range
-- **Manipulation (London session)**: Price sweeps liquidity above/below Asia range — stop hunts
-- **Distribution (NY session)**: True direction revealed — ride the impulse
-
-The system detects which AMD phase is active and identifies whether a stop hunt (manipulation) occurred above or below the Asia range to anticipate the distribution direction.
-
-### Order Blocks
-Last bearish candle before a bullish 3-candle impulse (Bullish OB = support) or last bullish candle before a bearish impulse (Bearish OB = resistance). Entry is placed at the OB body zone. Rated STRONG / MODERATE / WEAK by impulse size.
-
-### Fair Value Gaps (Imbalances)
-3-candle pattern where price moves so fast it leaves a gap between candle 1 and candle 3. FVGs act as magnets — price typically returns to fill them. Entry at the FVG midpoint or edge when confluent with OB.
-
-### Confluence System
-Each of the following adds to the bull/bear score:
-- AMD bias (25 pts) + stop hunt detection (20 pts)
-- Order Block strength: STRONG +20, MODERATE +12, WEAK +6
-- FVG near price +15
-- Support/Resistance level +10–15
-- RSI oversold/overbought +10
-- MACD crossover +8
-- Bollinger Band touch +8
-
-Trade signals only fire when score difference ≥ 15 and total ≥ 25.
-
----
-
-## Deploy to Vercel
-
-### 1. Push to GitHub
+1. Clone the repository:
 ```bash
-git init
-git add .
-git commit -m "Gold terminal"
-git remote add origin https://github.com/YOUR/gold-signal.git
-git push -u origin main
+git clone https://github.com/your-username/pipnexus.git
+cd pipnexus
 ```
 
-### 2. Import to Vercel
-1. vercel.com → New Project → Import your repo
-2. Add Environment Variables:
-   - `TWELVE_DATA_API_KEY` = your Twelve Data key
-   - `OPENAI_API_KEY` = your OpenAI key
-   - `JBLANKED_API_KEY` = your JBlanked key (free at jblanked.com)
-   - `GOLDAPI_KEY` = your GoldAPI.io key (free at goldapi.io)
-3. Deploy ✓
-
----
-
-## Local Dev
+2. Install dependencies:
 ```bash
 npm install
-cp .env.example .env.local
-# add your keys to .env.local
-npm run dev
-# open http://localhost:3000
 ```
 
----
+3. Configure environment variables:
+```bash
+cp .env.example .env.local
+```
 
-## Timeframes
+4. Edit `.env.local` with your API keys:
+```env
+TWELVE_DATA_API_KEY=your_twelve_data_key
+ANTHROPIC_API_KEY=your_anthropic_key
+GOLDAPI_KEY=your_goldapi_key
+JBLANKED_API_KEY=your_jblanked_key  # Optional
+```
+
+5. Run the development server:
+```bash
+npm run dev
+```
+
+6. Open [http://localhost:3000](http://localhost:3000)
+
+## API Keys Setup
+
+| Service | Required | Description | Sign Up |
+|---------|----------|-------------|---------|
+| Twelve Data | Yes | Market data & indicators | [twelvedata.com](https://twelvedata.com) |
+| Anthropic | Yes | AI analysis | [anthropic.com](https://anthropic.com) |
+| GoldAPI.io | No | Spot prices | [goldapi.io](https://goldapi.io) |
+| Trading Economics | No | Economic calendar | [tradingeconomics.com](https://tradingeconomics.com) |
+
+## Project Structure
+
+```
+├── lib/
+│   ├── anthropic.ts      # Claude AI integration
+│   ├── analysis.ts       # ICT technical analysis (enhanced)
+│   ├── news.ts           # Fundamental analysis (enhanced)
+│   ├── goldapi.ts        # Spot price data
+│   └── twelvedata.ts     # Market data API
+├── pages/
+│   ├── api/
+│   │   └── analyze.ts    # Main analysis endpoint
+│   ├── about.tsx        # About page
+│   ├── history.tsx       # Signal history & performance
+│   ├── reviews.tsx       # User testimonials
+│   ├── waitlist.tsx      # Early access signup
+│   ├── how-to-use.tsx    # Platform guide
+│   └── blog/
+│       └── index.tsx     # Trading insights
+├── index.tsx             # Main terminal UI
+├── package.json
+└── README.md
+```
+
+## Pages
+
+| Page | Description |
+|------|-------------|
+| `/` | Main trading terminal with signals |
+| `/about` | About PipNexus, team, technology |
+| `/history` | Historical signals & win rate stats |
+| `/reviews` | User testimonials & ratings |
+| `/waitlist` | Early access email signup |
+| `/how-to-use` | Platform guide & API setup |
+| `/blog` | Trading education & insights |
+
+## ICT Methodology
+
+### AMD Phases
+- **Accumulation**: Smart money builds positions within a tight range
+- **Manipulation**: Price sweeps liquidity — stop hunts occur
+- **Distribution**: True direction revealed — ride the impulse
+- **Decline**: Sustained downtrend in progress
+
+### Order Blocks
+Last bearish candle before a bullish impulse (Bullish OB) or last bullish candle before a bearish impulse (Bearish OB). Rated STRONG / MODERATE / WEAK.
+
+### Fair Value Gaps (FVGs)
+3-candle pattern where price leaves a gap. FVGs act as magnets — price typically returns to fill them.
+
+### Confluence System
+- AMD bias + stop hunt detection
+- Order Block strength
+- FVG near price
+- Support/Resistance levels
+- RSI oversold/overbought
+- MACD histogram direction
+- Bollinger Band touches
+
+## Deployment
+
+### Vercel (Recommended)
+
+1. Push your code to GitHub
+2. Import project in Vercel
+3. Configure environment variables:
+   - `TWELVE_DATA_API_KEY`
+   - `ANTHROPIC_API_KEY`
+   - `GOLDAPI_KEY`
+   - `JBLANKED_API_KEY` (optional)
+4. Deploy
+
+### Timeframes
+
 | TF  | Best for |
 |-----|----------|
 | M15 | Intraday scalping, precise OB entries |
@@ -131,5 +187,25 @@ npm run dev
 | H4  | Swing trades, key OB/FVG levels |
 | D1  | Macro bias, major S&R levels |
 
-## Disclaimer
-Educational only. Not financial advice. Gold trading carries significant risk.
+## Risk Warning
+
+**Trading involves substantial risk.** Past performance does not guarantee future results. This platform is for educational purposes only and should not be considered financial advice. Always practice proper risk management and trade with capital you can afford to lose.
+
+## License
+
+MIT License.
+
+## Credits
+
+- **Founder & CTO**: Rolland Muhanguzi
+- **CEO**: Shema Troy Tukahirwa
+
+Built with ICT Methodology and Anthropic Claude AI.
+
+---
+
+<div align="center">
+
+*© 2026 PipNexus. All rights reserved.*
+
+</div>

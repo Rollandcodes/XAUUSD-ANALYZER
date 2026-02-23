@@ -1,9 +1,31 @@
 // pages/api/analyze.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { fetchCandles, fetchQuote, fetchRSI, fetchMACD, fetchBBands, fetchATR } from '@/lib/twelvedata'
-import { detectAMD, detectOrderBlocks, detectFVGs, detectSRLevels, buildSignal } from '@/lib/analysis'
+import {
+  detectAMD,
+  detectOrderBlocks,
+  detectFVGs,
+  detectSRLevels,
+  buildSignal,
+  detectLiquidityZones,
+  detectPatterns,
+  getCurrentSession,
+  getSessionName,
+  analyzeMultiTimeframe,
+  type MTAResult,
+  type Pattern,
+  type LiquidityZone
+} from '@/lib/analysis'
 import { generateGoldNarrative } from '@/lib/openai'
-import { fetchTodayNews, fetchWeekNews, assessNewsRisk, computeNewsBias } from '@/lib/news'
+import {
+  fetchTodayNews,
+  fetchWeekNews,
+  assessNewsRisk,
+  computeNewsBias,
+  getMacroCorrelations,
+  rateEventsByImpact,
+  type MacroCorrelation
+} from '@/lib/news'
 import { fetchGoldSpot, fetchGoldWeekHistory, computeSpotInsights } from '@/lib/goldapi'
 
 const SYMBOL = 'XAU/USD'
@@ -42,9 +64,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const srLevels    = detectSRLevels(candles)
     const signal      = buildSignal(candles, rsi, macd, bbands, atr, amd, orderBlocks, fvgs, srLevels)
 
+    // Enhanced analysis
+    const liquidityZones = detectLiquidityZones(candles)
+    const patterns = detectPatterns(candles)
+
+    // Current trading session
+    const currentSession = getCurrentSession()
+    const sessionName = getSessionName(currentSession)
+
     // News analysis
     const newsRisk = assessNewsRisk(todayNews)
     const newsBias = computeNewsBias(todayNews)
+    const eventImpacts = rateEventsByImpact(weekNews)
+
+    // Macro correlations
+    const macroCorrelations = getMacroCorrelations(spotPrice)
 
     // Spot insights influence signal
     if (spotInsights?.spreadQuality === 'WIDE' && signal.action !== 'WAIT') {
@@ -94,15 +128,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       signal.confluences.push('WARNING: Fundamentals conflict with technical signal')
     }
 
-    // Generate GPT narrative
+    // Generate Claude narrative
     let narrative = ''
+    let deepAnalysis = ''
     try {
       narrative = await generateGoldNarrative({
         price: spotPrice, signal, amd, orderBlocks, fvgs, srLevels,
         rsi, macd, atr, interval, newsRisk, newsBias,
         goldSpot, spotInsights,
       })
-    } catch { narrative = amd.description }
+
+      // Generate deep analysis
+      deepAnalysis = await generateDeepAnalysis({
+        price: spotPrice, signal, amd, orderBlocks, fvgs, srLevels,
+        rsi, macd, bbands, atr, newsRisk, newsBias,
+        goldSpot, spotInsights, liquidityZones, patterns
+      })
+    } catch (err) {
+      console.warn('[narrative] generation failed:', err)
+      narrative = amd.description
+      deepAnalysis = narrative
+    }
 
     const upcomingHighImpact = weekNews
       .filter(e => e.Impact === 'High' && e.Currency === 'USD')
@@ -112,7 +158,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json({
       quote: { ...quote, close: spotPrice },  // prefer GoldAPI spot price
       candles, rsi, macd, bbands, atr,
-      amd, orderBlocks, fvgs, srLevels, signal, narrative,
+      amd, orderBlocks, fvgs, srLevels, signal, narrative, deepAnalysis,
+      // New enhanced data
+      liquidityZones,
+      patterns,
+      session: { current: currentSession, name: sessionName },
+      eventImpacts,
+      macroCorrelations,
       news: { today: todayNews.slice(0, 20), upcoming: upcomingHighImpact, risk: newsRisk, bias: newsBias },
       spot: goldSpot ? { ...goldSpot, insights: spotInsights, history: goldHistory } : null,
       timestamp: new Date().toISOString(),

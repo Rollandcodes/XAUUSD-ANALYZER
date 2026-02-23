@@ -215,6 +215,15 @@ export default function GoldTerminal() {
               )}
             </div>
 
+            {/* Navigation */}
+            <nav style={s.nav}>
+              <a href="/" style={s.navLink}>Terminal</a>
+              <a href="/about" style={s.navLink}>About</a>
+              <a href="/history" style={s.navLink}>History</a>
+              <a href="/reviews" style={s.navLink}>Reviews</a>
+              <a href="/waitlist" style={s.navWaitlist}>Join Waitlist</a>
+            </nav>
+
             <div style={s.controls}>
               <div style={s.ivRow}>
                 {INTERVALS.map(iv => (
@@ -533,7 +542,7 @@ export default function GoldTerminal() {
               <div style={{ ...s.card, gridColumn:'1 / -1' }} className="fu5">
                 <div style={s.cardHead}>
                   <span style={s.cardTitle}>AI NARRATIVE & CONFLUENCES</span>
-                  <span style={s.gptTag}>GPT-4o mini</span>
+                  <span style={s.gptTag}>ANTHROPIC CLAUDE</span>
                 </div>
                 <div style={s.narrativeGrid}>
                   <div style={s.narrativeText}>{data.narrative}</div>
@@ -736,6 +745,9 @@ const s: Record<string, React.CSSProperties> = {
   logoMark: { fontSize:36, color:'var(--gold)', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.6)) drop-shadow(0 0 32px rgba(201,168,76,0.3))' },
   logoTitle: { fontFamily:'var(--serif)', fontSize:22, fontWeight:600, letterSpacing:'0.12em', color:'var(--gold2)' },
   logoSub: { fontSize:8, letterSpacing:'0.25em', color:'var(--text3)', marginTop:1 },
+  nav: { display:'flex', alignItems:'center', gap:8 },
+  navLink: { fontSize:10, letterSpacing:'0.1em', color:'var(--text2)', textDecoration:'none', padding:'6px 12px', borderRadius:4, transition:'all 0.2s ease' },
+  navWaitlist: { fontSize:10, letterSpacing:'0.1em', color:'#000', background:'linear-gradient(135deg, #c9a84c 0%, #b89840 100%)', textDecoration:'none', padding:'6px 14px', borderRadius:4, fontWeight:600, boxShadow:'0 2px 8px rgba(201,168,76,0.3)' },
   livePrice: { display:'flex', flexDirection:'column', gap:2, marginLeft:16, paddingLeft:16, borderLeft:'1px solid var(--border)' },
   livePriceNum: { fontFamily:'var(--serif)', fontSize:24, fontWeight:600, color:'var(--text)', letterSpacing:'0.05em' },
   livePriceChg: { fontSize:11, letterSpacing:'0.06em' },
