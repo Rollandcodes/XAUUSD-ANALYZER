@@ -5,6 +5,17 @@ const FINNHUB_KEY = () => process.env.FINNHUB_API_KEY
 const ALPHA_BASE = 'https://www.alphavantage.co/query'
 const MARKETSTACK_BASE = 'https://api.marketstack.com/v1'
 const FINNHUB_BASE = 'https://finnhub.io/api/v1'
+const PROVIDER_TIMEOUT_MS = clampInt(process.env.PROVIDER_TIMEOUT_MS, 4_500, 1_000, 20_000)
+const PROVIDER_MAX_RETRIES = clampInt(process.env.PROVIDER_MAX_RETRIES, 1, 0, 3)
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504])
+
+function clampInt(raw: string | undefined, fallback: number, min: number, max: number): number {
+  const parsed = Number.parseInt(raw ?? '', 10)
+  if (!Number.isFinite(parsed)) return fallback
+  if (parsed < min) return min
+  if (parsed > max) return max
+  return parsed
+}
 
 export interface Quote {
   symbol: string
@@ -61,6 +72,48 @@ function toFinnhubSymbol(symbol: string): string {
   return `OANDA:${from}_${to}`
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function isRetryableError(error: unknown): boolean {
+  if (error instanceof Error) {
+    if (error.name === 'AbortError') return true
+    if (error.message.includes('fetch failed')) return true
+    if (error.message.includes('network')) return true
+    for (const code of RETRYABLE_STATUS) {
+      if (error.message.includes(` ${code}`)) return true
+    }
+  }
+  return false
+}
+
+async function fetchJsonWithRetry(url: string): Promise<any> {
+  let lastError: unknown
+
+  for (let attempt = 0; attempt <= PROVIDER_MAX_RETRIES; attempt++) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS)
+
+    try {
+      const res = await fetch(url, { cache: 'no-store', signal: controller.signal })
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+      return await res.json()
+    } catch (error) {
+      lastError = error
+      const shouldRetry = attempt < PROVIDER_MAX_RETRIES && isRetryableError(error)
+      if (!shouldRetry) break
+      await sleep(150 * (attempt + 1))
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Unknown provider fetch error')
+}
+
 async function fetchAlpha(params: Record<string, string>) {
   const key = ALPHA_KEY()
   if (!key) {
@@ -71,17 +124,7 @@ async function fetchAlpha(params: Record<string, string>) {
   Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v))
   url.searchParams.append('apikey', key)
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 20_000)
-  let res: Response
-  try {
-    res = await fetch(url.toString(), { cache: 'no-store', signal: controller.signal })
-  } finally {
-    clearTimeout(timeout)
-  }
-
-  if (!res.ok) throw new Error(`Alpha Vantage API error: ${res.status}`)
-  const data = await res.json()
+  const data = await fetchJsonWithRetry(url.toString())
   if (data?.ErrorMessage) {
     throw new Error(`Alpha Vantage API error: ${data.ErrorMessage}`)
   }
@@ -101,20 +144,7 @@ async function fetchMarketstack(endpoint: 'eod' | 'intraday', params: Record<str
   url.searchParams.append('access_key', key)
   Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v))
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 20_000)
-  let res: Response
-  try {
-    res = await fetch(url.toString(), { cache: 'no-store', signal: controller.signal })
-  } finally {
-    clearTimeout(timeout)
-  }
-
-  if (!res.ok) {
-    throw new Error(`Marketstack API error: ${res.status}`)
-  }
-
-  const data = await res.json()
+  const data = await fetchJsonWithRetry(url.toString())
   if (data?.error) {
     const message = data?.error?.message ?? data?.error?.code ?? 'Unknown error'
     throw new Error(`Marketstack API error: ${message}`)
@@ -133,20 +163,7 @@ async function fetchFinnhub(endpoint: string, params: Record<string, string>) {
   Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v))
   url.searchParams.append('token', key)
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 20_000)
-  let res: Response
-  try {
-    res = await fetch(url.toString(), { cache: 'no-store', signal: controller.signal })
-  } finally {
-    clearTimeout(timeout)
-  }
-
-  if (!res.ok) {
-    throw new Error(`Finnhub API error: ${res.status}`)
-  }
-
-  const data = await res.json()
+  const data = await fetchJsonWithRetry(url.toString())
   if (data?.error) {
     throw new Error(`Finnhub API error: ${data.error}`)
   }
