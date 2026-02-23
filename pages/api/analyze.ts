@@ -1,6 +1,6 @@
 // pages/api/analyze.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { fetchCandles, fetchQuote, fetchRSI, fetchMACD, fetchBBands, fetchATR } from '@/lib/twelvedata'
+import { fetchCandlesWithProvider, fetchQuoteWithProvider, fetchRSI, fetchMACD, fetchBBands, fetchATR } from '@/lib/twelvedata'
 import {
   detectAMD,
   detectOrderBlocks,
@@ -133,9 +133,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
 
     // Fetch everything in parallel — 4 data sources simultaneously
-    const [quote, candles, rsi, macd, bbands, atr, todayNews, weekNews, goldSpot] = await Promise.all([
-      fetchQuote(SYMBOL),
-      fetchCandles(SYMBOL, interval, 150),
+    const [quoteResult, candlesResult, rsi, macd, bbands, atr, todayNews, weekNews, goldSpot] = await Promise.all([
+      fetchQuoteWithProvider(SYMBOL),
+      fetchCandlesWithProvider(SYMBOL, interval, 150),
       fetchRSI(SYMBOL, interval),
       fetchMACD(SYMBOL, interval),
       fetchBBands(SYMBOL, interval),
@@ -144,6 +144,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       fetchWeekNews(),
       fetchGoldSpot(),            // GoldAPI.io — spot bid/ask/spread
     ])
+
+    const quote = quoteResult.quote
+    const candles = candlesResult.candles
 
     // Fetch weekly history separately (sequential, uses monthly API quota carefully)
     // Only fetch if goldSpot succeeded to avoid wasting quota
@@ -280,6 +283,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       eventImpacts,
       macroCorrelations,
       news: { today: todayNews.slice(0, 20), upcoming: upcomingHighImpact, risk: newsRisk, bias: newsBias },
+      providerUsed: {
+        candles: candlesResult.provider,
+        quote: quoteResult.provider
+      },
       spot: goldSpot ? { ...goldSpot, insights: spotInsights, history: goldHistory } : null,
       timestamp: new Date().toISOString(),
     })

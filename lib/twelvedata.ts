@@ -2,9 +2,11 @@
 const API_KEY = () => process.env.TWELVE_DATA_API_KEY!
 const ALPHA_KEY = () => process.env.ALPHAVANTAGE_API_KEY
 const MARKETSTACK_KEY = () => process.env.MARKETSTACK_API_KEY
+const FINNHUB_KEY = () => process.env.FINNHUB_API_KEY
 const BASE = 'https://api.twelvedata.com'
 const ALPHA_BASE = 'https://www.alphavantage.co/query'
 const MARKETSTACK_BASE = 'https://api.marketstack.com/v1'
+const FINNHUB_BASE = 'https://finnhub.io/api/v1'
 
 export interface Quote {
   symbol: string
@@ -27,6 +29,8 @@ export interface Candle {
   volume: number
 }
 
+export type DataProvider = 'twelve_data' | 'alpha_vantage' | 'marketstack' | 'finnhub' | 'synthetic'
+
 const candleCache = new Map<string, Candle[]>()
 
 function parseSymbol(symbol: string): { from: string; to: string } {
@@ -45,6 +49,18 @@ function mapIntervalToMarketstack(interval: string): { endpoint: 'eod' | 'intrad
   if (interval === '1day') return { endpoint: 'eod' }
   if (interval === '15min') return { endpoint: 'intraday', msInterval: '15min' }
   return { endpoint: 'intraday', msInterval: '1hour' }
+}
+
+function mapIntervalToFinnhub(interval: string): { resolution: '15' | '60' | 'D'; baseSeconds: number } {
+  if (interval === '15min') return { resolution: '15', baseSeconds: 15 * 60 }
+  if (interval === '1h') return { resolution: '60', baseSeconds: 60 * 60 }
+  if (interval === '4h') return { resolution: '60', baseSeconds: 60 * 60 }
+  return { resolution: 'D', baseSeconds: 24 * 60 * 60 }
+}
+
+function toFinnhubSymbol(symbol: string): string {
+  const [from = 'XAU', to = 'USD'] = symbol.split('/')
+  return `OANDA:${from}_${to}`
 }
 
 async function fetchAlpha(params: Record<string, string>) {
@@ -109,6 +125,37 @@ async function fetchMarketstack(endpoint: 'eod' | 'intraday', params: Record<str
   return data
 }
 
+async function fetchFinnhub(endpoint: string, params: Record<string, string>) {
+  const key = FINNHUB_KEY()
+  if (!key) {
+    throw new Error('Missing FINNHUB_API_KEY')
+  }
+
+  const url = new URL(`${FINNHUB_BASE}/${endpoint}`)
+  Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v))
+  url.searchParams.append('token', key)
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 20_000)
+  let res: Response
+  try {
+    res = await fetch(url.toString(), { cache: 'no-store', signal: controller.signal })
+  } finally {
+    clearTimeout(timeout)
+  }
+
+  if (!res.ok) {
+    throw new Error(`Finnhub API error: ${res.status}`)
+  }
+
+  const data = await res.json()
+  if (data?.error) {
+    throw new Error(`Finnhub API error: ${data.error}`)
+  }
+
+  return data
+}
+
 function parseAlphaSeries(data: any, interval: '15min' | '60min' | '1day'): Candle[] {
   const seriesKey =
     interval === '1day'
@@ -166,6 +213,38 @@ function parseMarketstackRows(rows: any[]): Candle[] {
     }))
     .filter((c: Candle) => Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close))
     .sort((a: Candle, b: Candle) => a.time - b.time)
+}
+
+function parseFinnhubCandles(data: any): Candle[] {
+  if (!data || data.s !== 'ok') {
+    return []
+  }
+
+  const t: number[] = data.t ?? []
+  const o: number[] = data.o ?? []
+  const h: number[] = data.h ?? []
+  const l: number[] = data.l ?? []
+  const c: number[] = data.c ?? []
+  const v: number[] = data.v ?? []
+
+  const size = Math.min(t.length, o.length, h.length, l.length, c.length)
+  const candles: Candle[] = []
+  for (let i = 0; i < size; i++) {
+    const candle: Candle = {
+      time: Number(t[i]),
+      open: Number(o[i]),
+      high: Number(h[i]),
+      low: Number(l[i]),
+      close: Number(c[i]),
+      volume: Number(v[i] ?? 0)
+    }
+
+    if (Number.isFinite(candle.open) && Number.isFinite(candle.high) && Number.isFinite(candle.low) && Number.isFinite(candle.close)) {
+      candles.push(candle)
+    }
+  }
+
+  return candles.sort((a, b) => a.time - b.time)
 }
 
 async function fetchAlphaCandles(symbol: string, interval: string, count: number): Promise<Candle[]> {
@@ -229,6 +308,33 @@ async function fetchMarketstackCandles(symbol: string, interval: string, count: 
   const finalCandles = candles.slice(-count)
   if (finalCandles.length === 0) {
     throw new Error('Marketstack API error: No candle data returned')
+  }
+
+  return finalCandles
+}
+
+async function fetchFinnhubCandles(symbol: string, interval: string, count: number): Promise<Candle[]> {
+  const { resolution, baseSeconds } = mapIntervalToFinnhub(interval)
+  const now = Math.floor(Date.now() / 1000)
+  const multiplier = interval === '4h' ? 4 : 1
+  const lookbackSeconds = Math.max(count * baseSeconds * multiplier * 3, 14 * 24 * 60 * 60)
+  const from = now - lookbackSeconds
+
+  const data = await fetchFinnhub('forex/candle', {
+    symbol: toFinnhubSymbol(symbol),
+    resolution,
+    from: String(from),
+    to: String(now)
+  })
+
+  let candles = parseFinnhubCandles(data)
+  if (interval === '4h') {
+    candles = resampleTo4h(candles)
+  }
+
+  const finalCandles = candles.slice(-count)
+  if (!finalCandles.length) {
+    throw new Error('Finnhub API error: No candle data returned')
   }
 
   return finalCandles
@@ -364,23 +470,26 @@ async function fetchTwelve(endpoint: string, params: Record<string, any>) {
   return data
 }
 
-export async function fetchQuote(symbol: string): Promise<Quote> {
+export async function fetchQuoteWithProvider(symbol: string): Promise<{ quote: Quote; provider: DataProvider }> {
   if (process.env.TWELVE_DATA_API_KEY) {
     try {
       const data = await fetchTwelve('quote', { symbol })
       return {
-        symbol: data.symbol ?? symbol,
-        close: parseFloat(data.close ?? 2650),
-        change: parseFloat(data.change ?? 0),
-        percent_change: parseFloat(data.percent_change ?? 0),
-        high: parseFloat(data.high ?? 2660),
-        low: parseFloat(data.low ?? 2640),
-        open: parseFloat(data.open ?? 2650),
-        volume: parseInt(data.volume ?? 0),
-        fifty_two_week: {
-          low: parseFloat(data.fifty_two_week?.low ?? 2000),
-          high: parseFloat(data.fifty_two_week?.high ?? 2700)
-        }
+        quote: {
+          symbol: data.symbol ?? symbol,
+          close: parseFloat(data.close ?? 2650),
+          change: parseFloat(data.change ?? 0),
+          percent_change: parseFloat(data.percent_change ?? 0),
+          high: parseFloat(data.high ?? 2660),
+          low: parseFloat(data.low ?? 2640),
+          open: parseFloat(data.open ?? 2650),
+          volume: parseInt(data.volume ?? 0),
+          fifty_two_week: {
+            low: parseFloat(data.fifty_two_week?.low ?? 2000),
+            high: parseFloat(data.fifty_two_week?.high ?? 2700)
+          }
+        },
+        provider: 'twelve_data'
       }
     } catch (error) {
       console.warn('[data provider] Twelve Data quote failed, trying fallback:', error)
@@ -390,7 +499,7 @@ export async function fetchQuote(symbol: string): Promise<Quote> {
   if (ALPHA_KEY()) {
     try {
       const candles = await fetchAlphaCandles(symbol, '1day', 260)
-      if (candles.length) return quoteFromCandles(symbol, candles)
+      if (candles.length) return { quote: quoteFromCandles(symbol, candles), provider: 'alpha_vantage' }
     } catch (error) {
       console.warn('[data provider] Alpha Vantage quote failed, trying fallback:', error)
     }
@@ -399,28 +508,45 @@ export async function fetchQuote(symbol: string): Promise<Quote> {
   if (MARKETSTACK_KEY()) {
     try {
       const candles = await fetchMarketstackCandles(symbol, '1day', 260)
-      if (candles.length) return quoteFromCandles(symbol, candles)
+      if (candles.length) return { quote: quoteFromCandles(symbol, candles), provider: 'marketstack' }
     } catch (error) {
-      console.warn('[data provider] Marketstack quote failed, using synthetic fallback:', error)
+      console.warn('[data provider] Marketstack quote failed, trying fallback:', error)
     }
   }
 
-  return quoteFromCandles(symbol, generateMockCandles(260, 2650))
+  if (FINNHUB_KEY()) {
+    try {
+      const candles = await fetchFinnhubCandles(symbol, '1day', 260)
+      if (candles.length) return { quote: quoteFromCandles(symbol, candles), provider: 'finnhub' }
+    } catch (error) {
+      console.warn('[data provider] Finnhub quote failed, using synthetic fallback:', error)
+    }
+  }
+
+  return { quote: quoteFromCandles(symbol, generateMockCandles(260, 2650)), provider: 'synthetic' }
 }
 
-export async function fetchCandles(symbol: string, interval: string, count: number): Promise<Candle[]> {
+export async function fetchQuote(symbol: string): Promise<Quote> {
+  const { quote } = await fetchQuoteWithProvider(symbol)
+  return quote
+}
+
+export async function fetchCandlesWithProvider(symbol: string, interval: string, count: number): Promise<{ candles: Candle[]; provider: DataProvider }> {
   if (process.env.TWELVE_DATA_API_KEY) {
     try {
       const data = await fetchTwelve('time_series', { symbol, interval, outputsize: count })
       if (data.values && Array.isArray(data.values)) {
-        return data.values.map((v: any) => ({
-          time: new Date(v.datetime).getTime() / 1000,
-          open: parseFloat(v.open),
-          high: parseFloat(v.high),
-          low: parseFloat(v.low),
-          close: parseFloat(v.close),
-          volume: parseFloat(v.volume ?? 0)
-        })).reverse()
+        return {
+          candles: data.values.map((v: any) => ({
+            time: new Date(v.datetime).getTime() / 1000,
+            open: parseFloat(v.open),
+            high: parseFloat(v.high),
+            low: parseFloat(v.low),
+            close: parseFloat(v.close),
+            volume: parseFloat(v.volume ?? 0)
+          })).reverse(),
+          provider: 'twelve_data'
+        }
       }
     } catch (error) {
       console.warn('[data provider] Twelve Data candles failed, trying fallback:', error)
@@ -430,7 +556,7 @@ export async function fetchCandles(symbol: string, interval: string, count: numb
   if (ALPHA_KEY()) {
     try {
       const candles = await fetchAlphaCandles(symbol, interval, count)
-      if (candles.length) return candles
+      if (candles.length) return { candles, provider: 'alpha_vantage' }
     } catch (error) {
       console.warn('[data provider] Alpha Vantage candles failed, trying fallback:', error)
     }
@@ -439,13 +565,27 @@ export async function fetchCandles(symbol: string, interval: string, count: numb
   if (MARKETSTACK_KEY()) {
     try {
       const candles = await fetchMarketstackCandles(symbol, interval, count)
-      if (candles.length) return candles
+      if (candles.length) return { candles, provider: 'marketstack' }
     } catch (error) {
-      console.warn('[data provider] Marketstack candles failed, using synthetic fallback:', error)
+      console.warn('[data provider] Marketstack candles failed, trying fallback:', error)
     }
   }
 
-  return generateMockCandles(count, 2650)
+  if (FINNHUB_KEY()) {
+    try {
+      const candles = await fetchFinnhubCandles(symbol, interval, count)
+      if (candles.length) return { candles, provider: 'finnhub' }
+    } catch (error) {
+      console.warn('[data provider] Finnhub candles failed, using synthetic fallback:', error)
+    }
+  }
+
+  return { candles: generateMockCandles(count, 2650), provider: 'synthetic' }
+}
+
+export async function fetchCandles(symbol: string, interval: string, count: number): Promise<Candle[]> {
+  const { candles } = await fetchCandlesWithProvider(symbol, interval, count)
+  return candles
 }
 
 export async function fetchRSI(symbol: string, interval: string): Promise<number> {
