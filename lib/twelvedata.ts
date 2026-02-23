@@ -1,7 +1,10 @@
-// lib/twelvedata.ts — Market data integration with provider fallback
+// lib/twelvedata.ts — Market data integration with GoldAPI as primary for commodities
+import { fetchGoldSpot, fetchGoldWeekHistory, type GoldSpot, type GoldHistorical } from './goldapi'
+
 const ALPHA_KEY = () => process.env.ALPHAVANTAGE_API_KEY
 const MARKETSTACK_KEY = () => process.env.MARKETSTACK_API_KEY
 const FINNHUB_KEY = () => process.env.FINNHUB_API_KEY
+const GOLDAPI_KEY = () => process.env.GOLDAPI_KEY
 const ALPHA_BASE = 'https://www.alphavantage.co/query'
 const MARKETSTACK_BASE = 'https://api.marketstack.com/v1'
 const FINNHUB_BASE = 'https://finnhub.io/api/v1'
@@ -15,6 +18,14 @@ function clampInt(raw: string | undefined, fallback: number, min: number, max: n
   if (parsed < min) return min
   if (parsed > max) return max
   return parsed
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gold detection: Check if symbol is XAU/USD (gold commodity)
+// ─────────────────────────────────────────────────────────────────────────────
+function isGoldSymbol(symbol: string): boolean {
+  const normalized = normalizeSymbol(symbol)
+  return normalized === 'XAU/USD'
 }
 
 export interface Quote {
@@ -38,7 +49,7 @@ export interface Candle {
   volume: number
 }
 
-export type DataProvider = 'alpha_vantage' | 'marketstack' | 'finnhub' | 'synthetic'
+export type DataProvider = 'goldapi' | 'alpha_vantage' | 'marketstack' | 'finnhub' | 'synthetic'
 
 interface CandleCacheEntry {
   candles: Candle[]
@@ -56,6 +67,63 @@ function normalizeSymbol(symbol: string): string {
     return 'XAU/USD'
   }
   return symbol?.includes('/') ? symbol.toUpperCase() : symbol
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GoldAPI integration: Build candles from daily historical spot prices
+// ─────────────────────────────────────────────────────────────────────────────
+async function buildCandlesFromGoldAPI(count: number): Promise<Candle[]> {
+  try {
+    const history = await fetchGoldWeekHistory()
+    if (!history || history.length === 0) return []
+
+    const candles: Candle[] = history.map((h, idx) => {
+      const dateStr = h.date || ''
+      const date = new Date(
+        dateStr.slice(0, 4) + '-' + dateStr.slice(4, 6) + '-' + dateStr.slice(6, 8)
+      )
+      const time = Math.floor(date.getTime() / 1000)
+      
+      return {
+        time,
+        open: h.price,
+        high: h.ask || h.price,
+        low: h.bid || h.price,
+        close: h.price,
+        volume: 0
+      }
+    })
+
+    return candles.slice(-Math.min(count, candles.length))
+  } catch (error) {
+    console.warn('[goldapi] Failed to build candles from history:', error)
+    return []
+  }
+}
+
+async function quoteFromGoldAPI(symbol: string): Promise<Quote | null> {
+  try {
+    const spot = await fetchGoldSpot()
+    if (!spot) return null
+
+    return {
+      symbol: normalizeSymbol(symbol),
+      close: spot.price,
+      change: spot.ch,
+      percent_change: spot.chp,
+      high: spot.ask,
+      low: spot.bid,
+      open: spot.prev_close_price,
+      volume: 0,
+      fifty_two_week: {
+        low: spot.bid,
+        high: spot.ask
+      }
+    }
+  } catch (error) {
+    console.warn('[goldapi] Failed to fetch quote:', error)
+    return null
+  }
 }
 
 function getCacheTtlMs(interval: string): number {
@@ -419,21 +487,26 @@ function quoteFromCandles(symbol: string, candles: Candle[]): Quote {
   const prev = candles[candles.length - 2] ?? last
   const highs = candles.map(c => c.high)
   const lows = candles.map(c => c.low)
-  const change = (last?.close ?? 2650) - (prev?.close ?? 2650)
+  
+  // Use realistic fallback prices for gold
+  const isGold = isGoldSymbol(symbol)
+  const fallbackPrice = isGold ? 5180 : 2650
+  
+  const change = (last?.close ?? fallbackPrice) - (prev?.close ?? fallbackPrice)
   const percentChange = prev?.close ? (change / prev.close) * 100 : 0
 
   return {
     symbol,
-    close: last?.close ?? 2650,
+    close: last?.close ?? fallbackPrice,
     change,
     percent_change: percentChange,
-    high: last?.high ?? 2660,
-    low: last?.low ?? 2640,
-    open: last?.open ?? 2650,
+    high: last?.high ?? (fallbackPrice + 20),
+    low: last?.low ?? (fallbackPrice - 20),
+    open: last?.open ?? fallbackPrice,
     volume: last?.volume ?? 0,
     fifty_two_week: {
-      low: lows.length ? Math.min(...lows) : 2000,
-      high: highs.length ? Math.max(...highs) : 2700
+      low: lows.length ? Math.min(...lows) : (fallbackPrice - 200),
+      high: highs.length ? Math.max(...highs) : (fallbackPrice + 200)
     }
   }
 }
@@ -496,8 +569,8 @@ function calculateMACD(candles: Candle[]): { macd: number; signal: number; histo
 function calculateBBands(candles: Candle[]): { upper: number; middle: number; lower: number } {
   const closes = candles.map(c => c.close)
   if (closes.length < 20) {
-    const last = closes[closes.length - 1] ?? 2650
-    return { upper: last + 30, middle: last, lower: last - 30 }
+    const last = closes[closes.length - 1] ?? 5180
+    return { upper: last + 50, middle: last, lower: last - 50 }
   }
   const middle = sma(closes, 20)
   const sd = stdDev(closes, 20)
@@ -519,6 +592,16 @@ function calculateATR(candles: Candle[], period = 14): number {
 
 export async function fetchQuoteWithProvider(symbol: string): Promise<{ quote: Quote; provider: DataProvider }> {
   const canonical = normalizeSymbol(symbol)
+
+  // ✓ For gold commodities, use GoldAPI as primary source
+  if (isGoldSymbol(canonical) && GOLDAPI_KEY()) {
+    try {
+      const quote = await quoteFromGoldAPI(canonical)
+      if (quote) return { quote, provider: 'goldapi' }
+    } catch (error) {
+      console.warn('[data provider] GoldAPI quote failed:', error)
+    }
+  }
 
   if (FINNHUB_KEY()) {
     try {
@@ -547,7 +630,9 @@ export async function fetchQuoteWithProvider(symbol: string): Promise<{ quote: Q
     }
   }
 
-  return { quote: quoteFromCandles(canonical, generateMockCandles(260, 2650)), provider: 'synthetic' }
+  // Fallback to synthetic only if gold and GoldAPI not available
+  const fallbackPrice = isGoldSymbol(canonical) ? 5180 : 2650
+  return { quote: quoteFromCandles(canonical, generateMockCandles(260, fallbackPrice)), provider: 'synthetic' }
 }
 
 export async function fetchQuote(symbol: string): Promise<Quote> {
@@ -557,6 +642,19 @@ export async function fetchQuote(symbol: string): Promise<Quote> {
 
 export async function fetchCandlesWithProvider(symbol: string, interval: string, count: number): Promise<{ candles: Candle[]; provider: DataProvider }> {
   const canonical = normalizeSymbol(symbol)
+
+  // ✓ For gold commodities, use GoldAPI as primary source (free tier: 100 req/month)
+  if (isGoldSymbol(canonical) && GOLDAPI_KEY()) {
+    try {
+      const candles = await buildCandlesFromGoldAPI(count)
+      if (candles.length > 0) {
+        console.log(`[goldapi] Fetched ${candles.length} candles for ${canonical}`)
+        return { candles, provider: 'goldapi' }
+      }
+    } catch (error) {
+      console.warn('[data provider] GoldAPI candles failed:', error)
+    }
+  }
 
   if (FINNHUB_KEY()) {
     try {
@@ -585,7 +683,9 @@ export async function fetchCandlesWithProvider(symbol: string, interval: string,
     }
   }
 
-  return { candles: generateMockCandles(count, 2650), provider: 'synthetic' }
+  // Fallback to synthetic: use 5180 for gold, 2650 for others
+  const fallbackPrice = isGoldSymbol(canonical) ? 5180 : 2650
+  return { candles: generateMockCandles(count, fallbackPrice), provider: 'synthetic' }
 }
 
 export async function fetchCandles(symbol: string, interval: string, count: number): Promise<Candle[]> {
@@ -616,7 +716,10 @@ export async function fetchBBands(symbol: string, interval: string): Promise<{ u
     const candles = await fetchCandles(symbol, interval, 200)
     return calculateBBands(candles)
   } catch {
-    return { upper: 2680, middle: 2650, lower: 2620 }
+    // Fallback to realistic gold prices if fetch fails
+    const isGold = isGoldSymbol(symbol)
+    const basePrice = isGold ? 5180 : 2650
+    return { upper: basePrice + 50, middle: basePrice, lower: basePrice - 50 }
   }
 }
 
