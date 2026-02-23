@@ -1,7 +1,5 @@
-// lib/twelvedata.ts — Gold trading data with Twelve Data + GoldAPI fallback only
-import { fetchGoldSpot, fetchGoldWeekHistory, type GoldSpot, type GoldHistorical } from './goldapi'
+// lib/twelvedata.ts — Gold trading data with Twelve Data ONLY
 
-const GOLDAPI_KEY = () => process.env.GOLDAPI_KEY
 const TWELVEDATA_KEY = () => process.env.TWELVEDATA_API_KEY
 const TWELVEDATA_BASE = 'https://api.twelvedata.com'
 const PROVIDER_TIMEOUT_MS = clampInt(process.env.PROVIDER_TIMEOUT_MS, 4_500, 1_000, 20_000)
@@ -45,7 +43,7 @@ export interface Candle {
   volume: number
 }
 
-export type DataProvider = 'twelvedata' | 'goldapi' | 'synthetic'
+export type DataProvider = 'twelvedata' | 'synthetic'
 
 interface CandleCacheEntry {
   candles: Candle[]
@@ -67,61 +65,6 @@ function normalizeSymbol(symbol: string): string {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GoldAPI integration: Build candles from daily historical spot prices
-// ─────────────────────────────────────────────────────────────────────────────
-async function buildCandlesFromGoldAPI(count: number): Promise<Candle[]> {
-  try {
-    const history = await fetchGoldWeekHistory()
-    if (!history || history.length === 0) return []
-
-    const candles: Candle[] = history.map((h, idx) => {
-      const dateStr = h.date || ''
-      const date = new Date(
-        dateStr.slice(0, 4) + '-' + dateStr.slice(4, 6) + '-' + dateStr.slice(6, 8)
-      )
-      const time = Math.floor(date.getTime() / 1000)
-      
-      return {
-        time,
-        open: h.price,
-        high: h.ask || h.price,
-        low: h.bid || h.price,
-        close: h.price,
-        volume: 0
-      }
-    })
-
-    return candles.slice(-Math.min(count, candles.length))
-  } catch (error) {
-    console.warn('[goldapi] Failed to build candles from history:', error)
-    return []
-  }
-}
-
-async function quoteFromGoldAPI(symbol: string): Promise<Quote | null> {
-  try {
-    const spot = await fetchGoldSpot()
-    if (!spot) return null
-
-    return {
-      symbol: normalizeSymbol(symbol),
-      close: spot.price,
-      change: spot.ch,
-      percent_change: spot.chp,
-      high: spot.ask,
-      low: spot.bid,
-      open: spot.prev_close_price,
-      volume: 0,
-      fifty_two_week: {
-        low: spot.bid,
-        high: spot.ask
-      }
-    }
-  } catch (error) {
-    console.warn('[goldapi] Failed to fetch quote:', error)
-    return null
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Twelve Data integration: Accurate gold spot prices + candles
 // ─────────────────────────────────────────────────────────────────────────────
@@ -390,31 +333,18 @@ function calculateATR(candles: Candle[], period = 14): number {
 export async function fetchQuoteWithProvider(symbol: string): Promise<{ quote: Quote; provider: DataProvider }> {
   const canonical = normalizeSymbol(symbol)
 
-  // ✓ PRIMARY: Twelve Data (most accurate real-time gold prices)
+  // ✓ PRIMARY: Twelve Data (accurate real-time gold prices)
   if (TWELVEDATA_KEY()) {
     try {
       const quote = await fetchTwelveDataQuote(canonical)
       console.log(`[twelvedata] Quote fetched: ${quote.close}`)
       return { quote, provider: 'twelvedata' }
     } catch (error) {
-      console.warn('[twelvedata] Quote failed, trying GoldAPI fallback:', error)
+      console.warn('[twelvedata] Quote failed, using synthetic fallback:', error)
     }
   }
 
-  // ✓ FALLBACK: GoldAPI (backup for gold spot prices)
-  if (GOLDAPI_KEY()) {
-    try {
-      const quote = await quoteFromGoldAPI(canonical)
-      if (quote) {
-        console.log(`[goldapi] Quote fetched (fallback): ${quote.close}`)
-        return { quote, provider: 'goldapi' }
-      }
-    } catch (error) {
-      console.warn('[goldapi] Fallback failed:', error)
-    }
-  }
-
-  // ✓ LAST RESORT: Synthetic data with realistic prices
+  // ✓ FALLBACK: Synthetic data with realistic gold prices
   const fallbackPrice = isGoldSymbol(canonical) ? 5180 : 2650
   console.warn(`[synthetic] Using fallback price: ${fallbackPrice}`)
   return { quote: quoteFromCandles(canonical, generateMockCandles(260, fallbackPrice)), provider: 'synthetic' }
@@ -437,24 +367,11 @@ export async function fetchCandlesWithProvider(symbol: string, interval: string,
         return { candles, provider: 'twelvedata' }
       }
     } catch (error) {
-      console.warn('[twelvedata] Candles failed, trying GoldAPI fallback:', error)
+      console.warn('[twelvedata] Candles failed, using synthetic fallback:', error)
     }
   }
 
-  // ✓ FALLBACK: GoldAPI (daily data only, reconstructed as candles)
-  if (GOLDAPI_KEY()) {
-    try {
-      const candles = await buildCandlesFromGoldAPI(count)
-      if (candles.length > 0) {
-        console.log(`[goldapi] Fetched ${candles.length} candles (fallback, daily only)`)
-        return { candles, provider: 'goldapi' }
-      }
-    } catch (error) {
-      console.warn('[goldapi] Fallback failed:', error)
-    }
-  }
-
-  // ✓ LAST RESORT: Synthetic data with realistic gold prices
+  // ✓ FALLBACK: Synthetic data with realistic gold prices
   const fallbackPrice = isGoldSymbol(canonical) ? 5180 : 2650
   console.warn(`[synthetic] Generating ${count} mock candles at ${fallbackPrice}`)
   return { candles: generateMockCandles(count, fallbackPrice), provider: 'synthetic' }
