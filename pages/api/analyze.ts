@@ -28,6 +28,7 @@ import {
   type MacroCorrelation
 } from '@/lib/news'
 import { fetchGoldSpot, fetchGoldWeekHistory, computeSpotInsights } from '@/lib/goldapi'
+import { generatePriceActionSignal, type PriceActionSignal } from '@/lib/priceaction'
 
 const SYMBOL = 'XAU/USD'
 const ALLOWED_INTERVALS = new Set(['15min', '1h', '4h', '1day'])
@@ -36,6 +37,90 @@ const ALLOWED_INTERVALS = new Set(['15min', '1h', '4h', '1day'])
 const useOpenAI = !!process.env.OPENAI_API_KEY
 const generateGoldNarrative = useOpenAI ? generateGoldNarrativeOpenAI : generateGoldNarrativeAnthropic
 const generateDeepAnalysis = useOpenAI ? generateDeepAnalysisOpenAI : generateDeepAnalysisAnthropic
+
+// Combine ICT and Price Action signals
+function combineSignals(ictSignal: any, paSignal: PriceActionSignal, atr: number): any {
+  const ictAction = ictSignal.action
+  const paAction = paSignal.action
+  
+  // If both agree, boost confidence significantly
+  if (ictAction === paAction && ictAction !== 'WAIT') {
+    const combinedConfidence = Math.min(95, (ictSignal.confidence * 0.6 + paSignal.confidence * 0.4))
+    const avgEntry = (ictSignal.entry + paSignal.entry) / 2
+    const avgTP1 = (ictSignal.tp1 + paSignal.takeProfit1) / 2
+    const avgSL = (ictSignal.stopLoss + paSignal.stopLoss) / 2
+    
+    return {
+      ...ictSignal,
+      action: ictAction,
+      confidence: combinedConfidence,
+      entry: avgEntry,
+      tp1: avgTP1,
+      stopLoss: avgSL,
+      rr1: Math.abs(avgTP1 - avgEntry) / Math.abs(avgSL - avgEntry),
+      confluences: [
+        ...ictSignal.confluences,
+        `✓ PA Confirmation: ${paSignal.patterns.map(p => p.name).join(', ')}`,
+        `✓ Combined ICT + PA Confidence: ${combinedConfidence.toFixed(0)}%`
+      ],
+      priceActionPatterns: paSignal.patterns.map(p => p.name)
+    }
+  }
+  
+  // If they conflict, reduce confidence and default to WAIT or stronger signal
+  if (ictAction !== paAction && ictAction !== 'WAIT' && paAction !== 'WAIT') {
+    return {
+      ...ictSignal,
+      action: 'WAIT',
+      confidence: Math.min(ictSignal.confidence, paSignal.confidence) * 0.5,
+      confluences: [
+        ...ictSignal.confluences,
+        `⚠ Signal Conflict: ICT ${ictAction} vs PA ${paAction} — waiting for clarity`
+      ],
+      priceActionPatterns: paSignal.patterns.map(p => p.name)
+    }
+  }
+  
+  // If one is WAIT, use the stronger signal but reduce confidence slightly
+  if (ictAction === 'WAIT' && paAction !== 'WAIT') {
+    return {
+      ...ictSignal,
+      action: paSignal.action,
+      confidence: paSignal.confidence * 0.8,
+      entry: paSignal.entry,
+      tp1: paSignal.takeProfit1,
+      stopLoss: paSignal.stopLoss,
+      rr1: paSignal.riskReward,
+      confluences: [
+        `PA Signal: ${paSignal.action} (${paSignal.confidence.toFixed(0)}%)`,
+        ...paSignal.confluences,
+        `ICT showing consolidation/neutral`
+      ],
+      priceActionPatterns: paSignal.patterns.map(p => p.name)
+    }
+  }
+  
+  if (paAction === 'WAIT' && ictAction !== 'WAIT') {
+    return {
+      ...ictSignal,
+      confluences: [
+        ...ictSignal.confluences,
+        `PA showing consolidation — ICT signal ${ictAction} at ${ictSignal.confidence.toFixed(0)}%`
+      ],
+      priceActionPatterns: paSignal.patterns.map(p => p.name)
+    }
+  }
+  
+  // Both WAIT
+  return {
+    ...ictSignal,
+    confluences: [
+      ...ictSignal.confluences,
+      'PA + ICT agree: sideways/consolidation'
+    ],
+    priceActionPatterns: paSignal.patterns.map(p => p.name)
+  }
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -80,6 +165,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const liquidityZones = detectLiquidityZones(candles)
     const patterns = detectPatterns(candles)
 
+    // Price Action Analysis - Candles are already in the correct format
+    const priceActionSignal = generatePriceActionSignal(candles, spotPrice, atr.value)
+
+    // Combine ICT + Price Action signals for hybrid confidence
+    const hybridSignal = combineSignals(signal, priceActionSignal, atr.value)
+
     // Current trading session
     const currentSession = getCurrentSession()
     const sessionName = getSessionName(currentSession)
@@ -93,51 +184,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const macroCorrelations = getMacroCorrelations(spotPrice)
 
     // Spot insights influence signal
-    if (spotInsights?.spreadQuality === 'WIDE' && signal.action !== 'WAIT') {
-      signal.confidence = Math.max(20, signal.confidence - 10)
-      signal.confluences.push(`⚠ Wide bid/ask spread (${goldSpot?.spread?.toFixed(2)}) — possible low liquidity`)
+    if (spotInsights?.spreadQuality === 'WIDE' && hybridSignal.action !== 'WAIT') {
+      hybridSignal.confidence = Math.max(20, hybridSignal.confidence - 10)
+      hybridSignal.confluences.push(`⚠ Wide bid/ask spread (${goldSpot?.spread?.toFixed(2)}) — possible low liquidity`)
     }
 
     // Weekly position context
     if (spotInsights?.weeklyRange) {
       const pos = spotInsights.weeklyRange.positionPct
-      if (signal.action === 'BUY' && pos > 80) {
-        signal.confidence = Math.max(20, signal.confidence - 8)
-        signal.confluences.push(`Price at ${pos}% of weekly range — near weekly high, BUY risk elevated`)
+      if (hybridSignal.action === 'BUY' && pos > 80) {
+        hybridSignal.confidence = Math.max(20, hybridSignal.confidence - 8)
+        hybridSignal.confluences.push(`Price at ${pos}% of weekly range — near weekly high, BUY risk elevated`)
       }
-      if (signal.action === 'SELL' && pos < 20) {
-        signal.confidence = Math.max(20, signal.confidence - 8)
-        signal.confluences.push(`Price at ${pos}% of weekly range — near weekly low, SELL risk elevated`)
+      if (hybridSignal.action === 'SELL' && pos < 20) {
+        hybridSignal.confidence = Math.max(20, hybridSignal.confidence - 8)
+        hybridSignal.confluences.push(`Price at ${pos}% of weekly range — near weekly low, SELL risk elevated`)
       }
-      if (signal.action === 'BUY' && pos < 30) {
-        signal.confidence = Math.min(95, signal.confidence + 5)
-        signal.confluences.push(`Buying near weekly low (${pos}% range) — discount zone`)
+      if (hybridSignal.action === 'BUY' && pos < 30) {
+        hybridSignal.confidence = Math.min(95, hybridSignal.confidence + 5)
+        hybridSignal.confluences.push(`Buying near weekly low (${pos}% range) — discount zone`)
       }
-      if (signal.action === 'SELL' && pos > 70) {
-        signal.confidence = Math.min(95, signal.confidence + 5)
-        signal.confluences.push(`Selling near weekly high (${pos}% range) — premium zone`)
+      if (hybridSignal.action === 'SELL' && pos > 70) {
+        hybridSignal.confidence = Math.min(95, hybridSignal.confidence + 5)
+        hybridSignal.confluences.push(`Selling near weekly high (${pos}% range) — premium zone`)
       }
     }
 
     // News risk override
-    if (newsRisk.avoid && signal.action !== 'WAIT') {
-      signal.action     = 'WAIT'
-      signal.confidence = Math.min(signal.confidence, 25)
-      signal.confluences.push('BLOCKED: High-impact news imminent — protect capital')
+    if (newsRisk.avoid && hybridSignal.action !== 'WAIT') {
+      hybridSignal.action     = 'WAIT'
+      hybridSignal.confidence = Math.min(hybridSignal.confidence, 25)
+      hybridSignal.confluences.push('BLOCKED: High-impact news imminent — protect capital')
     }
 
-    if (newsBias.bias === 'BULLISH_GOLD' && signal.action === 'BUY') {
-      signal.confidence = Math.min(95, signal.confidence + 10)
-      signal.confluences.push('Fundamentals confirm: USD weakness → Gold bullish')
-    } else if (newsBias.bias === 'BEARISH_GOLD' && signal.action === 'SELL') {
-      signal.confidence = Math.min(95, signal.confidence + 10)
-      signal.confluences.push('Fundamentals confirm: USD strength → Gold bearish')
+    if (newsBias.bias === 'BULLISH_GOLD' && hybridSignal.action === 'BUY') {
+      hybridSignal.confidence = Math.min(95, hybridSignal.confidence + 10)
+      hybridSignal.confluences.push('Fundamentals confirm: USD weakness → Gold bullish')
+    } else if (newsBias.bias === 'BEARISH_GOLD' && hybridSignal.action === 'SELL') {
+      hybridSignal.confidence = Math.min(95, hybridSignal.confidence + 10)
+      hybridSignal.confluences.push('Fundamentals confirm: USD weakness → Gold bearish')
     } else if (
-      (newsBias.bias === 'BULLISH_GOLD' && signal.action === 'SELL') ||
-      (newsBias.bias === 'BEARISH_GOLD' && signal.action === 'BUY')
+      (newsBias.bias === 'BULLISH_GOLD' && hybridSignal.action === 'SELL') ||
+      (newsBias.bias === 'BEARISH_GOLD' && hybridSignal.action === 'BUY')
     ) {
-      signal.confidence = Math.max(20, signal.confidence - 15)
-      signal.confluences.push('WARNING: Fundamentals conflict with technical signal')
+      hybridSignal.confidence = Math.max(20, hybridSignal.confidence - 15)
+      hybridSignal.confluences.push('WARNING: Fundamentals conflict with technical signal')
     }
 
     // Generate Claude narrative
@@ -145,16 +236,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let deepAnalysis = ''
     try {
       narrative = await generateGoldNarrative({
-        price: spotPrice, signal, amd, orderBlocks, fvgs, srLevels,
+        price: spotPrice, signal: hybridSignal, amd, orderBlocks, fvgs, srLevels,
         rsi, macd, atr, interval, newsRisk, newsBias,
-        goldSpot, spotInsights,
+        goldSpot, spotInsights, priceActionSignal
       })
 
       // Generate deep analysis
       deepAnalysis = await generateDeepAnalysis({
-        price: spotPrice, signal, amd, orderBlocks, fvgs, srLevels,
+        price: spotPrice, signal: hybridSignal, amd, orderBlocks, fvgs, srLevels,
         rsi, macd, bbands, atr, newsRisk, newsBias,
-        goldSpot, spotInsights, liquidityZones, patterns
+        goldSpot, spotInsights, liquidityZones, patterns, priceActionSignal
       })
     } catch (err) {
       console.warn('[narrative] generation failed:', err)
@@ -170,8 +261,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json({
       quote: { ...quote, close: spotPrice },  // prefer GoldAPI spot price
       candles, rsi, macd, bbands, atr,
-      amd, orderBlocks, fvgs, srLevels, signal, narrative, deepAnalysis,
-      // New enhanced data
+      amd, orderBlocks, fvgs, srLevels, 
+      signal: hybridSignal,  // Hybrid ICT + PA signal
+      narrative, 
+      deepAnalysis,
+      // Price Action Analysis
+      priceAction: {
+        signal: priceActionSignal,
+        patterns: priceActionSignal.patterns,
+        chartPattern: priceActionSignal.chartPattern,
+        wickAnalysis: priceActionSignal.wickAnalysis,
+        confidence: priceActionSignal.confidence
+      },
+      // Enhanced ICT data
       liquidityZones,
       patterns,
       session: { current: currentSession, name: sessionName },

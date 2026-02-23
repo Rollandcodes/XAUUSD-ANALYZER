@@ -14,6 +14,12 @@
     "Forex",
     "BOLLINGER",
     "nosniff",
-    "SAMEORIGIN"
+    "SAMEORIGIN",
+    "candlestick",
+    "engulfing",
+    "doji",
+    "priceaction",
+    "wickanalysis",
+    "trendlines"
   ]
 }
