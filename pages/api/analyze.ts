@@ -166,10 +166,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const patterns = detectPatterns(candles)
 
     // Price Action Analysis - Candles are already in the correct format
-    const priceActionSignal = generatePriceActionSignal(candles, spotPrice, atr.value)
+    const priceActionSignal = generatePriceActionSignal(candles, spotPrice, atr)
 
     // Combine ICT + Price Action signals for hybrid confidence
-    const hybridSignal = combineSignals(signal, priceActionSignal, atr.value)
+    const hybridSignal = combineSignals(signal, priceActionSignal, atr)
 
     // Current trading session
     const currentSession = getCurrentSession()

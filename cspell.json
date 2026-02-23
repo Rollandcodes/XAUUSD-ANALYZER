@@ -20,6 +20,18 @@
     "doji",
     "priceaction",
     "wickanalysis",
-    "trendlines"
+    "trendlines",
+    "sharperatio",
+    "profitfactor",
+    "pnl",
+    "drawdown",
+    "expectancy",
+    "fractional",
+    "volatility",
+    "orderly",
+    "advisoryengine",
+    "riskmanagement",
+    "recoveryfactor",
+    "GDXJ"
   ]
 }
