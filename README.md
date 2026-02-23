@@ -111,13 +111,13 @@ npm run dev
 
 ## API Keys Setup
 
-| Service | Required | Description | Sign Up |
-|---------|----------|-------------|---------|
-| Twelve Data | Yes | Market data & indicators | [twelvedata.com](https://twelvedata.com) |
-| OpenAI | Yes | AI analysis | [openai.com](https://openai.com) |
-| Anthropic | Optional | Alternative AI engine | [anthropic.com](https://anthropic.com) |
-| GoldAPI.io | No | Spot prices | [goldapi.io](https://goldapi.io) |
-| Trading Economics | No | Economic calendar | [tradingeconomics.com](https://tradingeconomics.com) |
+|Service|Required|Description|Sign Up|
+|---|---|---|---|
+|Twelve Data|Yes|Market data & indicators|[twelvedata.com](https://twelvedata.com)|
+|OpenAI|Yes|AI analysis|[openai.com](https://openai.com)|
+|Anthropic|Optional|Alternative AI engine|[anthropic.com](https://anthropic.com)|
+|GoldAPI.io|No|Spot prices|[goldapi.io](https://goldapi.io)|
+|Trading Economics|No|Economic calendar|[tradingeconomics.com](https://tradingeconomics.com)|
 
 ## Project Structure
 
@@ -146,15 +146,15 @@ npm run dev
 
 ## Pages
 
-| Page | Description |
-|------|-------------|
-| `/` | Main trading terminal with signals |
-| `/about` | About PipNexus, team, technology |
-| `/history` | Historical signals & win rate stats |
-| `/reviews` | User testimonials & ratings |
-| `/waitlist` | Early access email signup |
-| `/how-to-use` | Platform guide & API setup |
-| `/blog` | Trading education & insights |
+|Page|Description|
+|---|---|
+|`/`|Main trading terminal with signals|
+|`/about`|About PipNexus, team, technology|
+|`/history`|Historical signals & win rate stats|
+|`/reviews`|User testimonials & ratings|
+|`/waitlist`|Early access email signup|
+|`/how-to-use`|Platform guide & API setup|
+|`/blog`|Trading education & insights|
 
 ## ICT Methodology
 
@@ -200,12 +200,12 @@ Last bearish candle before a bullish impulse (Bullish OB) or last bullish candle
 
 ### Timeframes
 
-| TF  | Best for |
-|-----|----------|
-| M15 | Intraday scalping, precise OB entries |
-| H1  | Day trading, AMD session analysis |
-| H4  | Swing trades, key OB/FVG levels |
-| D1  | Macro bias, major S&R levels |
+|TF|Best for|
+|---|---|
+|M15|Intraday scalping, precise OB entries|
+|H1|Day trading, AMD session analysis|
+|H4|Swing trades, key OB/FVG levels|
+|D1|Macro bias, major S&R levels|
 
 ## Risk Warning
 
