@@ -50,9 +50,13 @@ export default function GoldTerminal() {
   const chartRef    = useRef<HTMLDivElement>(null)
   const chartInst   = useRef<any>(null)
   const seriesRef   = useRef<any>(null)
-  const timerRef    = useRef<any>()
+  const rafRef      = useRef<number | null>(null)
+  const lastAutoRun = useRef<number>(0)
+  const analyzingRef = useRef(false)
 
   const analyze = useCallback(async (int = interval) => {
+    if (analyzingRef.current) return
+    analyzingRef.current = true
     setLoading(true); setError('')
     try {
       const res  = await fetch('/api/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ interval: int }) })
@@ -61,7 +65,7 @@ export default function GoldTerminal() {
       setData(json)
       setLastUp(new Date())
     } catch(e:any) { setError(e.message??'Analysis failed') }
-    finally        { setLoading(false) }
+    finally        { analyzingRef.current = false; setLoading(false) }
   }, [interval])
 
   // ── Chart ──────────────────────────────────────────────────────────────────
@@ -126,8 +130,25 @@ export default function GoldTerminal() {
   }, [])
 
   useEffect(() => {
-    if (autoRef && data) timerRef.current = setInterval(() => analyze(), 60_000)
-    return () => clearInterval(timerRef.current)
+    if (!autoRef || !data) return
+
+    const tick = (ts: number) => {
+      if (!lastAutoRun.current) lastAutoRun.current = ts
+      if (ts - lastAutoRun.current >= 60_000) {
+        lastAutoRun.current = ts
+        void analyze()
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
+    rafRef.current = requestAnimationFrame(tick)
+    return () => {
+      lastAutoRun.current = 0
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
   }, [autoRef, analyze, data])
 
   const sig    = data?.signal
@@ -216,31 +237,32 @@ export default function GoldTerminal() {
             </div>
 
             {/* Navigation */}
-            <nav style={s.nav}>
-              <a href="/" style={s.navLink}>Terminal</a>
-              <a href="/about" style={s.navLink}>About</a>
-              <a href="/history" style={s.navLink}>History</a>
-              <a href="/reviews" style={s.navLink}>Reviews</a>
-              <a href="/waitlist" style={s.navWaitlist}>Join Waitlist</a>
+            <nav style={s.nav} aria-label="Primary">
+              <a href="/" style={s.navLink} aria-label="Open terminal page">Terminal</a>
+              <a href="/about" style={s.navLink} aria-label="Open about page">About</a>
+              <a href="/history" style={s.navLink} aria-label="Open history page">History</a>
+              <a href="/reviews" style={s.navLink} aria-label="Open reviews page">Reviews</a>
+              <a href="/waitlist" style={s.navWaitlist} aria-label="Join waitlist page">Join Waitlist</a>
             </nav>
 
             <div style={s.controls}>
               <div style={s.ivRow}>
                 {INTERVALS.map(iv => (
                   <button key={iv.value} style={{ ...s.ivBtn, ...(interval===iv.value?s.ivBtnActive:{}) }}
+                    aria-label={`Set interval to ${iv.label}`}
                     onClick={() => { setInterval_(iv.value); analyze(iv.value) }}>
                     {iv.label}
                   </button>
                 ))}
               </div>
-              <button style={{ ...s.analyzeBtn, opacity: loading?0.5:1 }} onClick={() => analyze()} disabled={loading}>
+              <button style={{ ...s.analyzeBtn, opacity: loading?0.5:1 }} aria-label="Run analysis now" onClick={() => analyze()} disabled={loading}>
                 {loading ? <span style={s.spinner} /> : '⟳ ANALYZE'}
               </button>
-              <label style={s.toggleWrap}>
+              <label style={s.toggleWrap} aria-label="Toggle auto refresh">
                 <div style={{ ...s.toggleBg, background: autoRef?'var(--gold-glow)':'var(--bg3)', borderColor: autoRef?'var(--gold)':'var(--border)' }}>
                   <div style={{ ...s.toggleThumb, transform: autoRef?'translateX(14px)':'translateX(0)', background: autoRef?'var(--gold)':'var(--text3)' }} />
                 </div>
-                <input type="checkbox" style={{display:'none'}} checked={autoRef} onChange={e => setAutoRef(e.target.checked)} />
+                <input type="checkbox" className="sr-only" checked={autoRef} onChange={e => setAutoRef(e.target.checked)} />
                 <span style={s.toggleLabel}>AUTO</span>
               </label>
             </div>
@@ -248,7 +270,7 @@ export default function GoldTerminal() {
         </header>
 
         {/* ── ERROR ── */}
-        {error && <div style={s.error}>⚠ {error}</div>}
+        {error && <div style={s.error} role="alert" aria-live="assertive">⚠ {error}</div>}
 
         {/* ── EMPTY STATE ── */}
         {!data && !loading && !error && (

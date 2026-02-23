@@ -6,16 +6,23 @@ export default function Waitlist() {
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!email) return
 
     setLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setSubmitted(true)
-    setLoading(false)
+    setError('')
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      setSubmitted(true)
+    } catch {
+      setError('Could not submit your email. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const benefits = [
@@ -43,13 +50,13 @@ export default function Waitlist() {
         {/* Header */}
         <header style={s.header}>
           <Link href="/" style={s.logo}>
-            <span style={s.logoMark}>⬡</span>
+            <span style={s.logoMark} aria-hidden="true">⬡</span>
             <div>
               <div style={s.logoTitle}>PIPNEXUS</div>
               <div style={s.logoSub}>XAU/USD · ICT INTELLIGENCE</div>
             </div>
           </Link>
-          <nav style={s.nav}>
+          <nav style={s.nav} aria-label="Primary">
             <Link href="/" style={s.navLink}>Terminal</Link>
             <Link href="/about" style={s.navLink}>About</Link>
             <Link href="/history" style={s.navLink}>History</Link>
@@ -61,7 +68,7 @@ export default function Waitlist() {
         <main style={s.main}>
           {/* Hero */}
           <div style={s.hero}>
-            <div style={s.heroIcon}>⬡</div>
+            <div style={s.heroIcon} aria-hidden="true">⬡</div>
             <h1 style={s.heroTitle}>
               Join the <span style={s.gold}>PipNexus</span> Waitlist
             </h1>
@@ -74,13 +81,17 @@ export default function Waitlist() {
           {/* Form */}
           {!submitted ? (
             <form onSubmit={handleSubmit} style={s.form}>
+              <label htmlFor="waitlist-email" className="sr-only">Email address</label>
               <input
+                id="waitlist-email"
                 type="email"
                 placeholder="Enter your email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 style={s.input}
                 required
+                aria-invalid={error ? 'true' : 'false'}
+                aria-describedby={error ? 'waitlist-error' : undefined}
               />
               <button type="submit" style={s.submitBtn} disabled={loading}>
                 {loading ? (
@@ -98,6 +109,12 @@ export default function Waitlist() {
                 Thanks for joining! We'll notify you when early access opens up.
               </p>
             </div>
+          )}
+
+          {error && (
+            <p id="waitlist-error" style={s.errorText} role="alert" aria-live="assertive">
+              {error}
+            </p>
           )}
 
           {/* Benefits */}
@@ -176,6 +193,7 @@ const s: Record<string, any> = {
   successIcon: { width: '56px', height: '56px', borderRadius: '50%', background: 'var(--green)', color: '#000', fontSize: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' },
   successTitle: { fontFamily: 'var(--serif)', fontSize: '24px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' },
   successText: { fontSize: '14px', color: 'var(--text2)' },
+  errorText: { fontSize: '13px', color: 'var(--text2)', marginBottom: '24px' },
   benefitsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '48px' },
   benefitCard: { background: 'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)', border: '1px solid rgba(184,152,90,0.15)', borderRadius: '10px', padding: '24px', textAlign: 'center' },
   benefitIcon: { fontSize: '20px', color: 'var(--gold)', marginBottom: '12px' },
