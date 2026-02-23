@@ -1,13 +1,15 @@
-// lib/twelvedata.ts — Market data integration with GoldAPI as primary for commodities
+// lib/twelvedata.ts — Market data integration with Twelve Data primary for gold
 import { fetchGoldSpot, fetchGoldWeekHistory, type GoldSpot, type GoldHistorical } from './goldapi'
 
 const ALPHA_KEY = () => process.env.ALPHAVANTAGE_API_KEY
 const MARKETSTACK_KEY = () => process.env.MARKETSTACK_API_KEY
 const FINNHUB_KEY = () => process.env.FINNHUB_API_KEY
 const GOLDAPI_KEY = () => process.env.GOLDAPI_KEY
+const TWELVEDATA_KEY = () => process.env.TWELVEDATA_API_KEY
 const ALPHA_BASE = 'https://www.alphavantage.co/query'
 const MARKETSTACK_BASE = 'https://api.marketstack.com/v1'
 const FINNHUB_BASE = 'https://finnhub.io/api/v1'
+const TWELVEDATA_BASE = 'https://api.twelvedata.com'
 const PROVIDER_TIMEOUT_MS = clampInt(process.env.PROVIDER_TIMEOUT_MS, 4_500, 1_000, 20_000)
 const PROVIDER_MAX_RETRIES = clampInt(process.env.PROVIDER_MAX_RETRIES, 1, 0, 3)
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504])
@@ -49,7 +51,7 @@ export interface Candle {
   volume: number
 }
 
-export type DataProvider = 'goldapi' | 'alpha_vantage' | 'marketstack' | 'finnhub' | 'synthetic'
+export type DataProvider = 'twelvedata' | 'goldapi' | 'alpha_vantage' | 'marketstack' | 'finnhub' | 'synthetic'
 
 interface CandleCacheEntry {
   candles: Candle[]
@@ -124,6 +126,100 @@ async function quoteFromGoldAPI(symbol: string): Promise<Quote | null> {
     console.warn('[goldapi] Failed to fetch quote:', error)
     return null
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Twelve Data integration: Accurate gold spot prices + candles
+// ─────────────────────────────────────────────────────────────────────────────
+async function fetchTwelveData(endpoint: string, params: Record<string, string>) {
+  const key = TWELVEDATA_KEY()
+  if (!key) {
+    throw new Error('Missing TWELVEDATA_API_KEY')
+  }
+
+  const url = new URL(`${TWELVEDATA_BASE}/${endpoint}`)
+  Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v))
+  url.searchParams.append('apikey', key)
+
+  const data = await fetchJsonWithRetry(url.toString())
+  if (data?.status === 'error') {
+    throw new Error(`Twelve Data API error: ${data.message || 'Unknown error'}`)
+  }
+  return data
+}
+
+async function fetchTwelveDataQuote(symbol: string): Promise<Quote> {
+  const canonical = normalizeSymbol(symbol)
+  const [from = 'XAU', to = 'USD'] = canonical.split('/')
+  
+  const data = await fetchTwelveData('quote', {
+    symbol: `${from}/${to}`,
+    exchange: 'COMEX'
+  })
+
+  const close = Number(data?.close)
+  const change = Number(data?.change)
+  const percentChange = Number(data?.percent_change)
+  const high = Number(data?.high)
+  const low = Number(data?.low)
+  const open = Number(data?.open)
+
+  if (!Number.isFinite(close) || close <= 0) {
+    throw new Error('Twelve Data quote error: invalid price')
+  }
+
+  return {
+    symbol: canonical,
+    close,
+    change: Number.isFinite(change) ? change : 0,
+    percent_change: Number.isFinite(percentChange) ? percentChange : 0,
+    high: Number.isFinite(high) ? high : close,
+    low: Number.isFinite(low) ? low : close,
+    open: Number.isFinite(open) ? open : close,
+    volume: 0,
+    fifty_two_week: {
+      low: Number.isFinite(low) ? low : close * 0.9,
+      high: Number.isFinite(high) ? high : close * 1.1
+    }
+  }
+}
+
+async function fetchTwelveDataCandles(symbol: string, interval: string, count: number): Promise<Candle[]> {
+  const canonical = normalizeSymbol(symbol)
+  const [from = 'XAU', to = 'USD'] = canonical.split('/')
+  const cacheKey = `${canonical}:${interval}:${count}`
+  const cached = candleCache.get(cacheKey)
+  if (cached && Date.now() - cached.fetchedAt <= getCacheTtlMs(interval)) return cached.candles
+
+  const twelveDataInterval = interval === '15min' ? '15min' : interval === '1h' ? '1h' : interval === '4h' ? '4h' : '1day'
+  
+  const data = await fetchTwelveData('time_series', {
+    symbol: `${from}/${to}`,
+    interval: twelveDataInterval,
+    outputsize: String(Math.min(count * 2, 5000)),
+    exchange: 'COMEX'
+  })
+
+  const values = Array.isArray(data?.values) ? data.values : []
+  const candles: Candle[] = values
+    .map((bar: any) => ({
+      time: Math.floor(new Date(bar.datetime).getTime() / 1000),
+      open: Number(bar.open),
+      high: Number(bar.high),
+      low: Number(bar.low),
+      close: Number(bar.close),
+      volume: Number(bar.volume ?? 0)
+    }))
+    .filter((c: Candle) => Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close))
+    .sort((a: Candle, b: Candle) => a.time - b.time)
+
+  const finalCandles = candles.slice(-count)
+  if (finalCandles.length === 0) {
+    throw new Error('Twelve Data API error: No candle data returned')
+  }
+
+  candleCache.set(cacheKey, { candles: finalCandles, fetchedAt: Date.now() })
+  return finalCandles
 }
 
 function getCacheTtlMs(interval: string): number {
@@ -593,7 +689,17 @@ function calculateATR(candles: Candle[], period = 14): number {
 export async function fetchQuoteWithProvider(symbol: string): Promise<{ quote: Quote; provider: DataProvider }> {
   const canonical = normalizeSymbol(symbol)
 
-  // ✓ For gold commodities, use GoldAPI as primary source
+  // ✓ For gold commodities, use Twelve Data as PRIMARY (most accurate)
+  if (isGoldSymbol(canonical) && TWELVEDATA_KEY()) {
+    try {
+      const quote = await fetchTwelveDataQuote(canonical)
+      return { quote, provider: 'twelvedata' }
+    } catch (error) {
+      console.warn('[data provider] Twelve Data quote failed, trying GoldAPI:', error)
+    }
+  }
+
+  // ✓ For gold, use GoldAPI as FALLBACK
   if (isGoldSymbol(canonical) && GOLDAPI_KEY()) {
     try {
       const quote = await quoteFromGoldAPI(canonical)
@@ -630,7 +736,7 @@ export async function fetchQuoteWithProvider(symbol: string): Promise<{ quote: Q
     }
   }
 
-  // Fallback to synthetic only if gold and GoldAPI not available
+  // Fallback to synthetic only if gold and providers not available
   const fallbackPrice = isGoldSymbol(canonical) ? 5180 : 2650
   return { quote: quoteFromCandles(canonical, generateMockCandles(260, fallbackPrice)), provider: 'synthetic' }
 }
@@ -643,12 +749,25 @@ export async function fetchQuote(symbol: string): Promise<Quote> {
 export async function fetchCandlesWithProvider(symbol: string, interval: string, count: number): Promise<{ candles: Candle[]; provider: DataProvider }> {
   const canonical = normalizeSymbol(symbol)
 
-  // ✓ For gold commodities, use GoldAPI as primary source (free tier: 100 req/month)
+  // ✓ For gold commodities, use Twelve Data as PRIMARY (most accurate)
+  if (isGoldSymbol(canonical) && TWELVEDATA_KEY()) {
+    try {
+      const candles = await fetchTwelveDataCandles(canonical, interval, count)
+      if (candles.length > 0) {
+        console.log(`[twelvedata] Fetched ${candles.length} candles for ${canonical}`)
+        return { candles, provider: 'twelvedata' }
+      }
+    } catch (error) {
+      console.warn('[data provider] Twelve Data candles failed, trying GoldAPI:', error)
+    }
+  }
+
+  // ✓ For gold commodities, use GoldAPI as FALLBACK
   if (isGoldSymbol(canonical) && GOLDAPI_KEY()) {
     try {
       const candles = await buildCandlesFromGoldAPI(count)
       if (candles.length > 0) {
-        console.log(`[goldapi] Fetched ${candles.length} candles for ${canonical}`)
+        console.log(`[goldapi] Fetched ${candles.length} candles for ${canonical} (fallback)`)
         return { candles, provider: 'goldapi' }
       }
     } catch (error) {
