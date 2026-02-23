@@ -143,9 +143,58 @@ export default function GoldTerminal() {
         <title>XAU/USD · Gold Terminal</title>
         <meta name="description" content="XAUUSD AI trading terminal — AMD, Order Blocks, FVG, S&R" />
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬡</text></svg>" />
+        <style>{`
+          :root {
+            --bg: #06070a; --bg2: #0d0f14; --bg3: #14161c; --bg4: #1a1d24;
+            --text: #eae8e0; --text2: #c5c2b8; --text3: #9a9280;
+            --border: rgba(184,152,90,0.12); --border2: rgba(184,152,90,0.18); --border3: rgba(184,152,90,0.25);
+            --gold: #c9a84c; --gold2: #e8c97a; --gold-glow: rgba(201,168,76,0.15); --gold-dim: rgba(201,168,76,0.08);
+            --green: #3ddc97; --green2: rgba(61,220,151,0.1);
+            --red: #e05c6a; --red2: rgba(224,92,106,0.1);
+            --amber: #f0a500;
+            --mono: 'JetBrains Mono', 'Roboto Mono', 'Courier New', monospace;
+            --serif: 'Bricolage Grotesque', 'Inter', -apple-system, system-ui, sans-serif;
+          }
+          * { margin:0; padding:0; box-sizing:border-box; }
+          body { background:var(--bg); color:var(--text); font-family:var(--mono); font-size:13px; line-height:1.6; overflow-x:hidden; }
+          @keyframes spin { to { transform: rotate(360deg); } }
+          @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+          }
+          @keyframes glow {
+            0%, 100% { opacity: 0.4; filter: drop-shadow(0 0 24px rgba(201,168,76,0.3)); }
+            50% { opacity: 0.6; filter: drop-shadow(0 0 32px rgba(201,168,76,0.5)); }
+          }
+          @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+          @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .fu { animation: fadeUp 0.4s ease; }
+          .fu1 { animation: fadeUp 0.5s ease; }
+          .fu2 { animation: fadeUp 0.6s ease; }
+          .fu3 { animation: fadeUp 0.7s ease; }
+          .fu4 { animation: fadeUp 0.8s ease; }
+          .fu5 { animation: fadeUp 0.9s ease; }
+          button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.1); }
+          button:active:not(:disabled) { transform: translateY(0); }
+          button { transition: all 0.2s ease; }
+          ::-webkit-scrollbar { width: 8px; height: 8px; }
+          ::-webkit-scrollbar-track { background: var(--bg2); }
+          ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.3); border-radius: 4px; }
+          ::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,0.5); }
+        `}</style>
       </Head>
 
-      <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', position:'relative', zIndex:1 }}>
+      <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', position:'relative', zIndex:1, background:'linear-gradient(135deg, #050609 0%, #0a0b0e 50%, #0d0f14 100%)' }}>
+
+        {/* Ambient background effects */}
+        <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, pointerEvents:'none', zIndex:0, overflow:'hidden' }}>
+          <div style={{ position:'absolute', top:'-10%', left:'-10%', width:'40%', height:'40%', background:'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)', filter:'blur(80px)' }} />
+          <div style={{ position:'absolute', bottom:'-15%', right:'-10%', width:'50%', height:'50%', background:'radial-gradient(circle, rgba(61,220,151,0.06) 0%, transparent 70%)', filter:'blur(100px)' }} />
+          <div style={{ position:'absolute', top:'30%', right:'20%', width:'30%', height:'30%', background:'radial-gradient(circle, rgba(201,168,76,0.04) 0%, transparent 70%)', filter:'blur(90px)' }} />
+        </div>
 
         {/* ── HEADER ── */}
         <header style={s.header}>
@@ -675,10 +724,10 @@ function IndBlock({ label, value, color, badge, children }:
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s: Record<string, React.CSSProperties> = {
-  header: { position:'sticky', top:0, zIndex:100, background:'rgba(6,7,10,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid var(--border)', padding:'12px 24px' },
-  headerInner: { display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 },
-  logo: { display:'flex', alignItems:'center', gap:14 },
-  logoMark: { fontSize:32, color:'var(--gold)', filter:'drop-shadow(0 0 8px rgba(201,168,76,0.5))' },
+  header: { position:'sticky', top:0, zIndex:100, background:'rgba(6,7,10,0.85)', backdropFilter:'blur(24px) saturate(180%)', borderBottom:'1px solid rgba(201,168,76,0.2)', padding:'14px 28px', boxShadow:'0 4px 24px rgba(0,0,0,0.3)' },
+  headerInner: { display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:14 },
+  logo: { display:'flex', alignItems:'center', gap:16 },
+  logoMark: { fontSize:36, color:'var(--gold)', filter:'drop-shadow(0 0 16px rgba(201,168,76,0.6)) drop-shadow(0 0 32px rgba(201,168,76,0.3))' },
   logoTitle: { fontFamily:'var(--serif)', fontSize:22, fontWeight:600, letterSpacing:'0.12em', color:'var(--gold2)' },
   logoSub: { fontSize:8, letterSpacing:'0.25em', color:'var(--text3)', marginTop:1 },
   livePrice: { display:'flex', flexDirection:'column', gap:2, marginLeft:16, paddingLeft:16, borderLeft:'1px solid var(--border)' },
@@ -686,9 +735,9 @@ const s: Record<string, React.CSSProperties> = {
   livePriceChg: { fontSize:11, letterSpacing:'0.06em' },
   controls: { display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' },
   ivRow: { display:'flex', gap:4 },
-  ivBtn: { background:'transparent', border:'1px solid var(--border)', color:'var(--text2)', fontFamily:'var(--mono)', fontSize:10, padding:'5px 11px', borderRadius:3, cursor:'pointer', letterSpacing:'0.08em', transition:'all 0.15s' },
-  ivBtnActive: { background:'var(--gold-dim)', borderColor:'var(--border3)', color:'var(--gold2)' },
-  analyzeBtn: { background:'var(--gold)', color:'#000', border:'none', fontFamily:'var(--mono)', fontSize:11, fontWeight:700, letterSpacing:'0.1em', padding:'7px 18px', borderRadius:3, cursor:'pointer', display:'flex', alignItems:'center', gap:6 },
+  ivBtn: { background:'rgba(255,255,255,0.03)', border:'1px solid rgba(201,168,76,0.2)', color:'var(--text2)', fontFamily:'var(--mono)', fontSize:10, padding:'6px 13px', borderRadius:4, cursor:'pointer', letterSpacing:'0.08em', transition:'all 0.2s ease', boxShadow:'0 2px 8px rgba(0,0,0,0.2)' },
+  ivBtnActive: { background:'linear-gradient(135deg, rgba(201,168,76,0.15) 0%, rgba(201,168,76,0.08) 100%)', borderColor:'rgba(201,168,76,0.4)', color:'var(--gold)', boxShadow:'0 0 16px rgba(201,168,76,0.2), inset 0 1px 0 rgba(201,168,76,0.1)' },
+  analyzeBtn: { background:'linear-gradient(135deg, #c9a84c 0%, #b89840 100%)', color:'#000', border:'none', fontFamily:'var(--mono)', fontSize:11, fontWeight:700, letterSpacing:'0.1em', padding:'8px 20px', borderRadius:4, cursor:'pointer', display:'flex', alignItems:'center', gap:6, boxShadow:'0 4px 16px rgba(201,168,76,0.4), 0 2px 4px rgba(0,0,0,0.3)' },
   spinner: { width:12, height:12, border:'2px solid rgba(0,0,0,0.3)', borderTopColor:'#000', borderRadius:'50%', animation:'spin 0.7s linear infinite', display:'inline-block' },
   toggleWrap: { display:'flex', alignItems:'center', gap:7, cursor:'pointer' },
   toggleBg: { width:32, height:18, borderRadius:9, border:'1px solid', position:'relative', transition:'all 0.2s', display:'flex', alignItems:'center', padding:2 },
@@ -696,8 +745,8 @@ const s: Record<string, React.CSSProperties> = {
   toggleLabel: { fontSize:9, letterSpacing:'0.15em', color:'var(--text3)' },
   error: { margin:'12px 24px', background:'var(--red2)', border:'1px solid var(--red)', color:'var(--red)', fontFamily:'var(--mono)', fontSize:12, padding:'10px 16px', borderRadius:4 },
   empty: { flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16, padding:'80px 24px', textAlign:'center' },
-  emptyGlyph: { fontSize:60, color:'var(--gold)', opacity:0.3, animation:'glow 2s ease infinite' },
-  emptyTitle: { fontFamily:'var(--serif)', fontSize:32, fontWeight:300, letterSpacing:'0.1em', color:'var(--gold2)' },
+  emptyGlyph: { fontSize:72, color:'var(--gold)', opacity:0.4, animation:'glow 2s ease infinite', filter:'drop-shadow(0 0 24px rgba(201,168,76,0.3))' },
+  emptyTitle: { fontFamily:'var(--serif)', fontSize:36, fontWeight:300, letterSpacing:'0.12em', color:'var(--gold2)', textShadow:'0 0 24px rgba(201,168,76,0.2)' },
   emptyDesc: { fontSize:12, color:'var(--text3)', letterSpacing:'0.08em' },
   emptyBtn: { marginTop:12, background:'transparent', border:'1px solid var(--border3)', color:'var(--gold)', fontFamily:'var(--mono)', fontSize:11, letterSpacing:'0.12em', padding:'10px 28px', borderRadius:3, cursor:'pointer' },
   loadWrap: { padding:'48px 24px', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:12 },
@@ -706,7 +755,7 @@ const s: Record<string, React.CSSProperties> = {
   loadText: { fontSize:11, color:'var(--text3)', letterSpacing:'0.06em' },
   main: { padding:'16px 24px', flex:1 },
   // AMD Banner
-  amdBanner: { display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, background:'var(--bg2)', border:'1px solid', borderRadius:6, padding:'14px 18px', marginBottom:14 },
+  amdBanner: { display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:14, background:'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)', backdropFilter:'blur(12px)', border:'1px solid', borderRadius:8, padding:'16px 22px', marginBottom:16, boxShadow:'0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)' },
   amdLeft: { display:'flex', alignItems:'flex-start', gap:14, flex:1 },
   amdPhaseIcon: { fontSize:24, flexShrink:0, marginTop:2 },
   amdPhaseLabel: { fontFamily:'var(--serif)', fontSize:16, fontWeight:600, letterSpacing:'0.1em', marginBottom:3 },
@@ -715,8 +764,8 @@ const s: Record<string, React.CSSProperties> = {
   amdStat: { display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 as any },
   biasBadge: { border:'1px solid', fontFamily:'var(--mono)', fontSize:10, padding:'4px 10px', borderRadius:3, letterSpacing:'0.12em' },
   // Grid
-  grid: { display:'grid', gridTemplateColumns:'1fr 260px', gap:12 },
-  card: { background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:6, padding:'16px', overflow:'hidden' },
+  grid: { display:'grid', gridTemplateColumns:'1fr 280px', gap:14 },
+  card: { background:'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)', backdropFilter:'blur(12px)', border:'1px solid rgba(201,168,76,0.15)', borderRadius:8, padding:'18px', overflow:'hidden', boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)' },
   chartCard: { gridColumn:'1', gridRow:'1 / 3' },
   signalCard: { gridColumn:'2', gridRow:'1 / 4' },
   cardHead: { display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 },
@@ -724,8 +773,8 @@ const s: Record<string, React.CSSProperties> = {
   cardCount: { fontSize:9, letterSpacing:'0.1em', color:'var(--gold)', background:'var(--gold-dim)', padding:'2px 7px', borderRadius:2 },
   chartLegend: { display:'flex', gap:12, fontSize:9 },
   // Signal
-  actionBox: { border:'1px solid', borderRadius:4, padding:'14px 16px', marginBottom:14, display:'flex', flexDirection:'column', gap:4 },
-  actionVerb: { fontFamily:'var(--serif)', fontSize:32, fontWeight:700, letterSpacing:'0.1em' },
+  actionBox: { border:'2px solid', borderRadius:6, padding:'16px 18px', marginBottom:16, display:'flex', flexDirection:'column', gap:4, boxShadow:'0 0 24px currentColor, inset 0 1px 0 rgba(255,255,255,0.1)', position:'relative', overflow:'hidden' },
+  actionVerb: { fontFamily:'var(--serif)', fontSize:36, fontWeight:800, letterSpacing:'0.12em', textShadow:'0 0 20px currentColor' },
   actionSub: { fontSize:9, letterSpacing:'0.2em', opacity:0.7 },
   confRow: { display:'flex', justifyContent:'space-between', marginBottom:5 },
   confTrack: { height:2, background:'var(--bg3)', borderRadius:1, overflow:'hidden', marginBottom:16 },
@@ -738,21 +787,21 @@ const s: Record<string, React.CSSProperties> = {
   rrBadge: { fontSize:9, padding:'2px 5px', background:'var(--green2)', color:'var(--green)', borderRadius:2, letterSpacing:'0.05em' },
   invalidation: { background:'rgba(224,92,106,0.05)', border:'1px solid rgba(224,92,106,0.15)', borderRadius:4, padding:'10px 12px' },
   invalidText: { fontSize:11, color:'var(--text2)', lineHeight:1.5, marginTop:4 },
-  liveDot: { width:7, height:7, background:'var(--green)', borderRadius:'50%', animation:'pulse 1.5s ease infinite', boxShadow:'0 0 6px var(--green)' },
+  liveDot: { width:8, height:8, background:'var(--green)', borderRadius:'50%', animation:'pulse 1.5s ease infinite', boxShadow:'0 0 12px var(--green), 0 0 24px rgba(61,220,151,0.4)' },
   // OB
-  obRow: { borderLeft:'2px solid', paddingLeft:10, marginBottom:8, display:'flex', gap:12, alignItems:'center' },
+  obRow: { borderLeft:'3px solid', paddingLeft:12, marginBottom:10, display:'flex', gap:12, alignItems:'center', background:'rgba(255,255,255,0.02)', padding:'8px 8px 8px 12px', borderRadius:'0 4px 4px 0', transition:'all 0.2s ease' },
   obLeft: { display:'flex', flexDirection:'column', gap:3, minWidth:80 },
   obType: { fontSize:10, fontWeight:700, letterSpacing:'0.08em' },
   obStrength: { fontSize:9, letterSpacing:'0.1em' },
   obZone: { display:'flex', flexDirection:'column', gap:2 },
   obPrice: { fontSize:12, color:'var(--text)', fontFamily:'var(--serif)' },
   // FVG
-  fvgRow: { borderLeft:'2px solid', paddingLeft:10, marginBottom:8, display:'flex', gap:10, alignItems:'center' },
+  fvgRow: { borderLeft:'3px solid', paddingLeft:12, marginBottom:10, display:'flex', gap:10, alignItems:'center', background:'rgba(255,255,255,0.02)', padding:'8px 8px 8px 12px', borderRadius:'0 4px 4px 0', transition:'all 0.2s ease' },
   fvgBody: { flex:1, display:'flex', flexDirection:'column', gap:2 },
   fvgSize: { display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 },
   // S&R
-  srRow: { display:'flex', alignItems:'center', gap:10, marginBottom:8, padding:'6px 8px', background:'var(--bg3)', borderRadius:3 },
-  srDot: { width:6, height:6, borderRadius:'50%', flexShrink:0 },
+  srRow: { display:'flex', alignItems:'center', gap:10, marginBottom:10, padding:'8px 10px', background:'rgba(255,255,255,0.03)', borderRadius:5, border:'1px solid rgba(255,255,255,0.05)', transition:'all 0.2s ease' },
+  srDot: { width:8, height:8, borderRadius:'50%', flexShrink:0 },
   srInfo: { flex:1, display:'flex', flexDirection:'column', gap:2 },
   srPrice: { fontFamily:'var(--serif)', fontSize:14, color:'var(--text)' },
   srTouches: { display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 },
@@ -765,7 +814,7 @@ const s: Record<string, React.CSSProperties> = {
   rsiTrack: { position:'relative', height:5, background:'var(--bg3)', borderRadius:3, margin:'6px 0', overflow:'visible' },
   rsiOSZone: { position:'absolute', top:0, height:'100%', background:'rgba(61,220,151,0.12)' },
   rsiOBZone: { position:'absolute', top:0, height:'100%', background:'rgba(224,92,106,0.12)' },
-  rsiThumb: { position:'absolute', top:-4, width:12, height:12, background:'var(--gold)', borderRadius:'50%', transform:'translateX(-50%)', border:'2px solid var(--bg2)' },
+  rsiThumb: { position:'absolute', top:-4, width:12, height:12, background:'var(--gold)', borderRadius:'50%', transform:'translateX(-50%)', border:'2px solid var(--bg2)', boxShadow:'0 0 12px rgba(201,168,76,0.6), 0 0 6px rgba(201,168,76,0.4)' },
   rsiLbls: { display:'flex', justifyContent:'space-between', fontSize:8, color:'var(--text3)', marginTop:4 },
   // Narrative
   narrativeGrid: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 },
@@ -782,7 +831,7 @@ const s: Record<string, React.CSSProperties> = {
   gptTag: { fontSize:9, padding:'3px 8px', background:'var(--gold-dim)', border:'1px solid var(--border2)', color:'var(--gold)', borderRadius:2, letterSpacing:'0.06em' },
   footer: { borderTop:'1px solid var(--border)', padding:'12px 24px', display:'flex', justifyContent:'space-between', fontSize:9, color:'var(--text3)', letterSpacing:'0.06em', marginTop:8 },
   // GoldAPI Spot Strip
-  spotStrip:    { display:'flex', alignItems:'center', gap:0, background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:6, padding:'10px 18px', marginBottom:12, flexWrap:'wrap' as any },
+  spotStrip:    { display:'flex', alignItems:'center', gap:0, background:'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%)', backdropFilter:'blur(12px)', border:'1px solid rgba(201,168,76,0.2)', borderRadius:8, padding:'14px 20px', marginBottom:16, flexWrap:'wrap' as any, boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)' },
   spotDivider:  { width:1, height:44, background:'var(--border)', margin:'0 16px', flexShrink:0 },
   spotPriceBlock:{ display:'flex', flexDirection:'column', gap:3, minWidth:80 },
   spotLabel:    { fontSize:8, letterSpacing:'0.18em', color:'var(--text3)' },
@@ -796,7 +845,7 @@ const s: Record<string, React.CSSProperties> = {
   weeklyRangeRow:   { display:'flex', alignItems:'center', gap:8 },
   weeklyTrack:      { flex:1, height:4, background:'var(--bg3)', borderRadius:2, position:'relative', overflow:'visible' },
   weeklyMidLine:    { position:'absolute', left:'50%', top:-2, width:1, height:8, background:'var(--border2)' },
-  weeklyThumb:      { position:'absolute', top:-4, width:10, height:10, background:'var(--gold)', borderRadius:'50%', transform:'translateX(-50%)', border:'2px solid var(--bg2)', transition:'left 0.5s ease' },
+  weeklyThumb:      { position:'absolute', top:-4, width:10, height:10, background:'var(--gold)', borderRadius:'50%', transform:'translateX(-50%)', border:'2px solid var(--bg2)', transition:'left 0.5s ease', boxShadow:'0 0 10px rgba(201,168,76,0.6)' },
   // Gram prices
   gramBlock:   { display:'flex', flexDirection:'column', gap:6 },
   gramRow:     { display:'flex', gap:12 },
