@@ -97,6 +97,11 @@ export default function GoldTerminal() {
     }
   }, [interval])
 
+  // Auto-fetch fresh data on page load
+  useEffect(() => {
+    analyze()
+  }, []) // Run once on mount
+
   useEffect(() => {
     document.documentElement.setAttribute('data-contrast', highContrast ? 'high' : 'normal')
   }, [highContrast])
@@ -110,16 +115,17 @@ export default function GoldTerminal() {
 
       if (!chartInst.current) {
         chartInst.current = createChart(el, {
-          layout: { background:{type:ColorType.Solid,color:'#0a0b0e'}, textColor:'#9a9280', fontFamily:"'JetBrains Mono',monospace" },
-          grid:   { vertLines:{color:'rgba(184,152,90,0.06)'}, horzLines:{color:'rgba(184,152,90,0.06)'} },
-          crosshair: { mode:CrosshairMode.Normal, vertLine:{color:'rgba(201,168,76,0.4)',style:LineStyle.Dashed}, horzLine:{color:'rgba(201,168,76,0.4)',style:LineStyle.Dashed} },
-          rightPriceScale:{ borderColor:'rgba(184,152,90,0.15)' },
-          timeScale:{ borderColor:'rgba(184,152,90,0.15)', timeVisible:true, secondsVisible:false },
-          width: el.clientWidth, height: 380,
+          layout: { background:{type:ColorType.Solid,color:'#0a0b0e'}, textColor:'#b8985a', fontFamily:"'JetBrains Mono',monospace", fontSize: 12 },
+          grid:   { vertLines:{color:'rgba(184,152,90,0.08)'}, horzLines:{color:'rgba(184,152,90,0.08)'} },
+          crosshair: { mode:CrosshairMode.Normal, vertLine:{color:'rgba(201,168,76,0.5)',style:LineStyle.Dashed,width:1}, horzLine:{color:'rgba(201,168,76,0.5)',style:LineStyle.Dashed,width:1} },
+          rightPriceScale:{ borderColor:'rgba(184,152,90,0.2)', autoScale: true },
+          timeScale:{ borderColor:'rgba(184,152,90,0.2)', timeVisible:true, secondsVisible:false },
+          width: el.clientWidth, height: 480,
         })
         seriesRef.current = chartInst.current.addCandlestickSeries({
           upColor:'#3ddc97', downColor:'#e05c6a',
           borderVisible:false, wickUpColor:'#3ddc97', wickDownColor:'#e05c6a',
+          priceLineVisible: true,
         })
       }
 
@@ -130,25 +136,20 @@ export default function GoldTerminal() {
 
       const sig = data.signal
       if (sig.action !== 'WAIT') {
+        // Only show essential trade levels - cleaner chart
         const pls = [
-          { price:sig.entry,   color:'#c9a84c', title:'◈ ENTRY',  lineWidth:2, lineStyle:0 },
-          { price:sig.stopLoss,color:'#e05c6a', title:'✕ STOP',   lineWidth:1, lineStyle:2 },
-          { price:sig.tp1,     color:'#3ddc97', title:'▷ TP1',    lineWidth:1, lineStyle:2 },
-          { price:sig.tp2,     color:'#3ddc97', title:'▷ TP2',    lineWidth:1, lineStyle:2 },
-          { price:sig.tp3,     color:'#3ddc97', title:'▷ TP3',    lineWidth:1, lineStyle:2 },
+          { price:sig.entry,   color:'#c9a84c', title:'ENTRY',  lineWidth:2, lineStyle:0 },
+          { price:sig.stopLoss,color:'#e05c6a', title:'STOP',   lineWidth:2, lineStyle:2 },
+          { price:sig.tp1,     color:'#3ddc97', title:'TP1',    lineWidth:2, lineStyle:2 },
         ]
         pls.forEach(pl => seriesRef.current.createPriceLine(pl))
 
-        // FVG zones as background areas (using band series)
-        data.fvgs.slice(0,3).forEach(fvg => {
-          seriesRef.current.createPriceLine({ price:fvg.top,    color:'rgba(201,168,76,0.25)', title:'', lineWidth:1, lineStyle:LineStyle.Dotted })
-          seriesRef.current.createPriceLine({ price:fvg.bottom, color:'rgba(201,168,76,0.25)', title:'FVG', lineWidth:1, lineStyle:LineStyle.Dotted })
-        })
-
-        // S&R
-        data.srLevels.slice(0,5).forEach(sr => {
-          const c = sr.type.includes('SUPPORT') ? 'rgba(61,220,151,0.3)' : 'rgba(224,92,106,0.3)'
-          seriesRef.current.createPriceLine({ price:sr.price, color:c, title:sr.type.replace('_',' '), lineWidth:1, lineStyle:LineStyle.Dotted })
+        // Show only the 2 strongest S&R levels to avoid clutter
+        data.srLevels.slice(0,2).forEach(sr => {
+          const isSupport = sr.type.includes('SUPPORT')
+          const c = isSupport ? 'rgba(61,220,151,0.4)' : 'rgba(224,92,106,0.4)'
+          const label = isSupport ? 'SUPPORT' : 'RESISTANCE'
+          seriesRef.current.createPriceLine({ price:sr.price, color:c, title:label, lineWidth:1, lineStyle:LineStyle.Dotted })
         })
       }
       chartInst.current.timeScale().fitContent()
