@@ -12,6 +12,8 @@
     "Lbls",
     "FOREX",
     "Forex",
-    "BOLLINGER"
+    "BOLLINGER",
+    "nosniff",
+    "SAMEORIGIN"
   ]
 }

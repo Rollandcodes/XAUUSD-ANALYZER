@@ -16,7 +16,8 @@ import {
   type Pattern,
   type LiquidityZone
 } from '@/lib/analysis'
-import { generateGoldNarrative, generateDeepAnalysis } from '@/lib/anthropic'
+import { generateGoldNarrative as generateGoldNarrativeOpenAI, generateDeepAnalysis as generateDeepAnalysisOpenAI } from '@/lib/openai'
+import { generateGoldNarrative as generateGoldNarrativeAnthropic, generateDeepAnalysis as generateDeepAnalysisAnthropic } from '@/lib/anthropic'
 import {
   fetchTodayNews,
   fetchWeekNews,
@@ -30,6 +31,11 @@ import { fetchGoldSpot, fetchGoldWeekHistory, computeSpotInsights } from '@/lib/
 
 const SYMBOL = 'XAU/USD'
 const ALLOWED_INTERVALS = new Set(['15min', '1h', '4h', '1day'])
+
+// Prefer OpenAI if key present, fallback to Anthropic
+const useOpenAI = !!process.env.OPENAI_API_KEY
+const generateGoldNarrative = useOpenAI ? generateGoldNarrativeOpenAI : generateGoldNarrativeAnthropic
+const generateDeepAnalysis = useOpenAI ? generateDeepAnalysisOpenAI : generateDeepAnalysisAnthropic
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })

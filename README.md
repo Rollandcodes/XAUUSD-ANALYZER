@@ -1,5 +1,6 @@
 # ⬡ PipNexus - AI-Powered XAU/USD Gold Trading Terminal
 
+<!-- markdownlint-disable MD033 -->
 <div align="center">
 
 ![PipNexus](https://img.shields.io/badge/PipNexus-XAU%2FUSD-FFD700?style=for-the-badge)
@@ -8,14 +9,15 @@
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
 </div>
+<!-- markdownlint-enable MD033 -->
 
 ## Overview
 
-PipNexus is an intelligent XAU/USD gold trading terminal powered by **Anthropic Claude AI** and built on the **ICT (Inner Circle Trader)** methodology. It provides real-time market analysis, trade signals, and comprehensive fundamental analysis for gold traders.
+PipNexus is an intelligent XAU/USD gold trading terminal powered by **OpenAI/Anthropic AI** and built on the **ICT (Inner Circle Trader)** methodology. It provides real-time market analysis, trade signals, and comprehensive fundamental analysis for gold traders.
 
 ## What's New
 
-- **Claude AI Integration**: Replaced OpenAI with Anthropic Claude for deeper market analysis
+- **AI Integration**: OpenAI GPT-4 or Anthropic Claude for deeper market analysis
 - **Enhanced Technical Analysis**: Multi-timeframe analysis, advanced pattern recognition
 - **Improved Fundamental Analysis**: Real news API integration, sentiment analysis
 - **New Pages**: About, History, Reviews, Waitlist, How to Use, Blog
@@ -24,24 +26,28 @@ PipNexus is an intelligent XAU/USD gold trading terminal powered by **Anthropic 
 ## Features
 
 ### Core Analysis
+
 - **AMD Phase Detection**: Accumulation, Distribution, Manipulation, Decline phases
 - **Order Blocks**: Identification of institutional order flow zones
 - **Fair Value Gaps (FVGs)**: Detection of market imbalances
 - **Support & Resistance**: Smart Money Concepts-based levels
 
 ### Enhanced AI Analysis (New)
-- **Anthropic Claude Integration**: Deep market narrative generation with extended reasoning
+
+- **AI Integration**: Deep market narrative generation with extended reasoning
 - **Multi-Timeframe Analysis**: Confluence scoring across M15, H1, H4, D1
 - **Pattern Recognition**: CHoCH (Change of Character), BOS (Break of Structure), liquidity sweeps
 - **Liquidity Zone Detection**: Buy/Sell stops identification and stop hunt detection
 
 ### Technical Indicators
+
 - RSI (14)
 - MACD
 - Bollinger Bands
 - ATR
 
 ### Fundamental Analysis (Enhanced)
+
 - Real-time economic calendar (Trading Economics)
 - News risk assessment with timing
 - USD bias computation
@@ -51,7 +57,7 @@ PipNexus is an intelligent XAU/USD gold trading terminal powered by **Anthropic 
 ## Technology Stack
 
 - **Frontend**: Next.js 15, React 18, TypeScript
-- **AI**: Anthropic Claude Sonnet 4
+- **AI**: OpenAI GPT-4 or Anthropic Claude Sonnet 4
 - **Market Data**: Twelve Data API
 - **Spot Prices**: GoldAPI.io
 - **Economic Data**: Trading Economics / JBlanked
@@ -67,50 +73,58 @@ PipNexus is an intelligent XAU/USD gold trading terminal powered by **Anthropic 
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/your-username/pipnexus.git
 cd pipnexus
 ```
 
-2. Install dependencies:
+1. Install dependencies:
+
 ```bash
 npm install
 ```
 
-3. Configure environment variables:
+1. Configure environment variables:
+
 ```bash
 cp .env.example .env.local
 ```
 
-4. Edit `.env.local` with your API keys:
+1. Edit `.env.local` with your API keys:
+
 ```env
 TWELVE_DATA_API_KEY=your_twelve_data_key
+OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
 GOLDAPI_KEY=your_goldapi_key
 JBLANKED_API_KEY=your_jblanked_key  # Optional
 ```
 
-5. Run the development server:
+1. Run the development server:
+
 ```bash
 npm run dev
 ```
 
-6. Open [http://localhost:3000](http://localhost:3000)
+1. Open [http://localhost:3000](http://localhost:3000)
 
 ## API Keys Setup
 
 | Service | Required | Description | Sign Up |
 |---------|----------|-------------|---------|
 | Twelve Data | Yes | Market data & indicators | [twelvedata.com](https://twelvedata.com) |
-| Anthropic | Yes | AI analysis | [anthropic.com](https://anthropic.com) |
+| OpenAI | Yes | AI analysis | [openai.com](https://openai.com) |
+| Anthropic | Optional | Alternative AI engine | [anthropic.com](https://anthropic.com) |
 | GoldAPI.io | No | Spot prices | [goldapi.io](https://goldapi.io) |
 | Trading Economics | No | Economic calendar | [tradingeconomics.com](https://tradingeconomics.com) |
 
 ## Project Structure
 
-```
+```text
 ├── lib/
-│   ├── anthropic.ts      # Claude AI integration
+│   ├── openai.ts         # OpenAI GPT-4 integration
+│   ├── anthropic.ts      # Claude AI integration (fallback)
 │   ├── analysis.ts       # ICT technical analysis (enhanced)
 │   ├── news.ts           # Fundamental analysis (enhanced)
 │   ├── goldapi.ts        # Spot price data
@@ -118,7 +132,7 @@ npm run dev
 ├── pages/
 │   ├── api/
 │   │   └── analyze.ts    # Main analysis endpoint
-│   ├── about.tsx        # About page
+│   ├── about.tsx         # About page
 │   ├── history.tsx       # Signal history & performance
 │   ├── reviews.tsx       # User testimonials
 │   ├── waitlist.tsx      # Early access signup
@@ -145,18 +159,22 @@ npm run dev
 ## ICT Methodology
 
 ### AMD Phases
+
 - **Accumulation**: Smart money builds positions within a tight range
 - **Manipulation**: Price sweeps liquidity — stop hunts occur
 - **Distribution**: True direction revealed — ride the impulse
 - **Decline**: Sustained downtrend in progress
 
 ### Order Blocks
+
 Last bearish candle before a bullish impulse (Bullish OB) or last bullish candle before a bearish impulse (Bearish OB). Rated STRONG / MODERATE / WEAK.
 
 ### Fair Value Gaps (FVGs)
+
 3-candle pattern where price leaves a gap. FVGs act as magnets — price typically returns to fill them.
 
 ### Confluence System
+
 - AMD bias + stop hunt detection
 - Order Block strength
 - FVG near price
@@ -170,14 +188,15 @@ Last bearish candle before a bullish impulse (Bullish OB) or last bullish candle
 ### Vercel (Recommended)
 
 1. Push your code to GitHub
-2. Import project in Vercel
-3. Configure environment variables:
+1. Import project in Vercel
+1. Configure environment variables:
    - `TWELVE_DATA_API_KEY`
-   - `ANTHROPIC_API_KEY`
+   - `OPENAI_API_KEY`
+   - `ANTHROPIC_API_KEY` (optional)
    - `GOLDAPI_KEY`
    - `JBLANKED_API_KEY` (optional)
-4. Ensure `vercel.json` is committed (sets `pages/api/analyze.ts` max duration to 30s)
-5. Deploy
+1. Ensure `vercel.json` is committed (sets `pages/api/analyze.ts` max duration to 30s)
+1. Deploy
 
 ### Timeframes
 
@@ -201,12 +220,14 @@ MIT License.
 - **Founder & CTO**: Rolland Muhanguzi
 - **CEO**: Shema Troy Tukahirwa
 
-Built with ICT Methodology and Anthropic Claude AI.
+Built with ICT Methodology and AI.
 
 ---
 
+<!-- markdownlint-disable MD033 -->
 <div align="center">
 
 *© 2026 PipNexus. All rights reserved.*
 
 </div>
+<!-- markdownlint-enable MD033 -->
