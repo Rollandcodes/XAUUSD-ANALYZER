@@ -16,7 +16,7 @@ import {
   type Pattern,
   type LiquidityZone
 } from '@/lib/analysis'
-import { generateGoldNarrative } from '@/lib/openai'
+import { generateGoldNarrative, generateDeepAnalysis } from '@/lib/anthropic'
 import {
   fetchTodayNews,
   fetchWeekNews,
@@ -29,12 +29,18 @@ import {
 import { fetchGoldSpot, fetchGoldWeekHistory, computeSpotInsights } from '@/lib/goldapi'
 
 const SYMBOL = 'XAU/USD'
+const ALLOWED_INTERVALS = new Set(['15min', '1h', '4h', '1day'])
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  const { interval = '1h' } = req.body
+  const interval = req.body?.interval ?? '1h'
+  if (typeof interval !== 'string' || !ALLOWED_INTERVALS.has(interval)) {
+    return res.status(400).json({ error: 'Invalid interval' })
+  }
 
   try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+
     // Fetch everything in parallel — 4 data sources simultaneously
     const [quote, candles, rsi, macd, bbands, atr, todayNews, weekNews, goldSpot] = await Promise.all([
       fetchQuote(SYMBOL),
@@ -169,8 +175,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       spot: goldSpot ? { ...goldSpot, insights: spotInsights, history: goldHistory } : null,
       timestamp: new Date().toISOString(),
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[gold analyze]', err)
-    res.status(500).json({ error: err.message ?? 'Analysis failed' })
+    const message = err instanceof Error ? err.message : 'Analysis failed'
+    res.status(500).json({ error: message })
   }
 }

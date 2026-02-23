@@ -176,7 +176,8 @@ Last bearish candle before a bullish impulse (Bullish OB) or last bullish candle
    - `ANTHROPIC_API_KEY`
    - `GOLDAPI_KEY`
    - `JBLANKED_API_KEY` (optional)
-4. Deploy
+4. Ensure `vercel.json` is committed (sets `pages/api/analyze.ts` max duration to 30s)
+5. Deploy
 
 ### Timeframes
 

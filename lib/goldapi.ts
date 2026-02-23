@@ -36,8 +36,11 @@ const BASE = 'https://www.goldapi.io/api'
 const KEY  = () => process.env.GOLDAPI_KEY!
 
 function headers() {
+  const key = KEY()
+  if (!key) return null
+
   return {
-    'x-access-token': KEY(),
+    'x-access-token': key,
     'Content-Type':   'application/json',
   }
 }
@@ -45,7 +48,18 @@ function headers() {
 // ── Live spot price ───────────────────────────────────────────────────────────
 export async function fetchGoldSpot(): Promise<GoldSpot | null> {
   try {
-    const res  = await fetch(`${BASE}/XAU/USD`, { headers: headers(), cache: 'no-store' })
+    const requestHeaders = headers()
+    if (!requestHeaders) return null
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 20_000)
+    let res: Response
+    try {
+      res  = await fetch(`${BASE}/XAU/USD`, { headers: requestHeaders, cache: 'no-store', signal: controller.signal })
+    } finally {
+      clearTimeout(timeout)
+    }
+
     if (!res.ok) {
       console.warn('[goldapi] spot returned', res.status)
       return null
@@ -82,7 +96,18 @@ export async function fetchGoldSpot(): Promise<GoldSpot | null> {
 // ── Historical spot price for a specific date ─────────────────────────────────
 export async function fetchGoldHistorical(dateYYYYMMDD: string): Promise<GoldHistorical | null> {
   try {
-    const res = await fetch(`${BASE}/XAU/USD/${dateYYYYMMDD}`, { headers: headers() })
+    const requestHeaders = headers()
+    if (!requestHeaders) return null
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 20_000)
+    let res: Response
+    try {
+      res = await fetch(`${BASE}/XAU/USD/${dateYYYYMMDD}`, { headers: requestHeaders, signal: controller.signal })
+    } finally {
+      clearTimeout(timeout)
+    }
+
     if (!res.ok) return null
     const d = await res.json()
     if (d.error) return null

@@ -24,13 +24,30 @@ export interface Candle {
 }
 
 async function fetchTwelve(endpoint: string, params: Record<string, any>) {
+  const key = API_KEY()
+  if (!key) {
+    throw new Error('Missing TWELVE_DATA_API_KEY')
+  }
+
   const url = new URL(`${BASE}/${endpoint}`)
-  url.searchParams.append('apikey', API_KEY())
+  url.searchParams.append('apikey', key)
   Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, String(v)))
-  
-  const res = await fetch(url.toString(), { cache: 'no-store' })
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 20_000)
+  let res: Response
+  try {
+    res = await fetch(url.toString(), { cache: 'no-store', signal: controller.signal })
+  } finally {
+    clearTimeout(timeout)
+  }
+
   if (!res.ok) throw new Error(`Twelve Data API error: ${res.status}`)
-  return res.json()
+  const data = await res.json()
+  if (data?.status === 'error') {
+    throw new Error(`Twelve Data API error: ${data?.message ?? 'Unknown error'}`)
+  }
+  return data
 }
 
 export async function fetchQuote(symbol: string): Promise<Quote> {

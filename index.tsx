@@ -29,6 +29,7 @@ const INTERVALS = [
   { label:'M15', value:'15min' }, { label:'H1', value:'1h' },
   { label:'H4', value:'4h'    }, { label:'D1', value:'1day' },
 ]
+const ALLOWED_INTERVALS = new Set(INTERVALS.map(iv => iv.value))
 
 const f = (n:number, d=2) => (n??0).toFixed(d)
 const fSign = (n:number, d=2) => `${n>=0?'+':''}${n.toFixed(d)}`
@@ -46,6 +47,7 @@ export default function GoldTerminal() {
   const [loading,  setLoading]   = useState(false)
   const [error,    setError]     = useState('')
   const [autoRef,  setAutoRef]   = useState(false)
+  const [highContrast, setHighContrast] = useState(false)
   const [lastUp,   setLastUp]    = useState<Date|null>(null)
   const chartRef    = useRef<HTMLDivElement>(null)
   const chartInst   = useRef<any>(null)
@@ -56,17 +58,48 @@ export default function GoldTerminal() {
 
   const analyze = useCallback(async (int = interval) => {
     if (analyzingRef.current) return
+    const selectedInterval = ALLOWED_INTERVALS.has(int) ? int : '1h'
     analyzingRef.current = true
     setLoading(true); setError('')
+    let timeout: ReturnType<typeof setTimeout> | null = null
     try {
-      const res  = await fetch('/api/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ interval: int }) })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error)
+      const controller = new AbortController()
+      timeout = setTimeout(() => controller.abort(), 30_000)
+      const res  = await fetch('/api/analyze', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ interval: selectedInterval }),
+        signal: controller.signal,
+      })
+      if (timeout) clearTimeout(timeout)
+
+      let json: any = null
+      try {
+        json = await res.json()
+      } catch {
+        throw new Error(`Unexpected API response (${res.status})`)
+      }
+
+      if (!res.ok) throw new Error(json?.error ?? 'Analysis failed')
       setData(json)
       setLastUp(new Date())
-    } catch(e:any) { setError(e.message??'Analysis failed') }
-    finally        { analyzingRef.current = false; setLoading(false) }
+    } catch(e: any) {
+      if (e?.name === 'AbortError') {
+        setError('Analysis request timed out. Please try again.')
+      } else {
+        setError(e?.message ?? 'Analysis failed')
+      }
+    }
+    finally {
+      if (timeout) clearTimeout(timeout)
+      analyzingRef.current = false
+      setLoading(false)
+    }
   }, [interval])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-contrast', highContrast ? 'high' : 'normal')
+  }, [highContrast])
 
   // ── Chart ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -164,49 +197,9 @@ export default function GoldTerminal() {
         <title>XAU/USD · PipNexus Terminal</title>
         <meta name="description" content="PipNexus XAUUSD AI trading terminal — AMD, Order Blocks, FVG, S&R" />
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬡</text></svg>" />
-        <style>{`
-          :root {
-            --bg: #06070a; --bg2: #0d0f14; --bg3: #14161c; --bg4: #1a1d24;
-            --text: #eae8e0; --text2: #c5c2b8; --text3: #9a9280;
-            --border: rgba(184,152,90,0.12); --border2: rgba(184,152,90,0.18); --border3: rgba(184,152,90,0.25);
-            --gold: #c9a84c; --gold2: #e8c97a; --gold-glow: rgba(201,168,76,0.15); --gold-dim: rgba(201,168,76,0.08);
-            --green: #3ddc97; --green2: rgba(61,220,151,0.1);
-            --red: #e05c6a; --red2: rgba(224,92,106,0.1);
-            --amber: #f0a500;
-            --mono: 'JetBrains Mono', 'Roboto Mono', 'Courier New', monospace;
-            --serif: 'Bricolage Grotesque', 'Inter', -apple-system, system-ui, sans-serif;
-          }
-          * { margin:0; padding:0; box-sizing:border-box; }
-          body { background:var(--bg); color:var(--text); font-family:var(--mono); font-size:13px; line-height:1.6; overflow-x:hidden; }
-          @keyframes spin { to { transform: rotate(360deg); } }
-          @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.1); }
-          }
-          @keyframes glow {
-            0%, 100% { opacity: 0.4; filter: drop-shadow(0 0 24px rgba(201,168,76,0.3)); }
-            50% { opacity: 0.6; filter: drop-shadow(0 0 32px rgba(201,168,76,0.5)); }
-          }
-          @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-          @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .fu { animation: fadeUp 0.4s ease; }
-          .fu1 { animation: fadeUp 0.5s ease; }
-          .fu2 { animation: fadeUp 0.6s ease; }
-          .fu3 { animation: fadeUp 0.7s ease; }
-          .fu4 { animation: fadeUp 0.8s ease; }
-          .fu5 { animation: fadeUp 0.9s ease; }
-          button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.1); }
-          button:active:not(:disabled) { transform: translateY(0); }
-          button { transition: all 0.2s ease; }
-          ::-webkit-scrollbar { width: 8px; height: 8px; }
-          ::-webkit-scrollbar-track { background: var(--bg2); }
-          ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.3); border-radius: 4px; }
-          ::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,0.5); }
-        `}</style>
       </Head>
+
+      <a href="#main-content" className="skip-link">Skip to main content</a>
 
       <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', position:'relative', zIndex:1, background:'linear-gradient(135deg, #050609 0%, #0a0b0e 50%, #0d0f14 100%)' }}>
 
@@ -258,6 +251,15 @@ export default function GoldTerminal() {
               <button style={{ ...s.analyzeBtn, opacity: loading?0.5:1 }} aria-label="Run analysis now" onClick={() => analyze()} disabled={loading}>
                 {loading ? <span style={s.spinner} /> : '⟳ ANALYZE'}
               </button>
+              <button
+                type="button"
+                style={{ ...s.ivBtn, ...(highContrast ? s.ivBtnActive : {}) }}
+                aria-label="Toggle high contrast mode"
+                aria-pressed={highContrast}
+                onClick={() => setHighContrast(v => !v)}
+              >
+                CONTRAST
+              </button>
               <label style={s.toggleWrap} aria-label="Toggle auto refresh">
                 <div style={{ ...s.toggleBg, background: autoRef?'var(--gold-glow)':'var(--bg3)', borderColor: autoRef?'var(--gold)':'var(--border)' }}>
                   <div style={{ ...s.toggleThumb, transform: autoRef?'translateX(14px)':'translateX(0)', background: autoRef?'var(--gold)':'var(--text3)' }} />
@@ -286,7 +288,7 @@ export default function GoldTerminal() {
 
         {/* ── LOADING ── */}
         {loading && (
-          <div style={s.loadWrap}>
+          <div style={s.loadWrap} role="status" aria-live="polite">
             <div style={s.loadBar}><div style={s.loadFill} /></div>
             <div style={s.loadText}>Scanning XAUUSD · Fetching Spot Price · Detecting Order Blocks · Computing AMD Phase…</div>
           </div>
@@ -294,7 +296,7 @@ export default function GoldTerminal() {
 
         {/* ── DASHBOARD ── */}
         {data && !loading && (
-          <main style={s.main}>
+          <main id="main-content" style={s.main}>
 
             {/* ── GOLDAPI SPOT STRIP ── */}
             {data.spot && (
